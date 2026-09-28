@@ -346,13 +346,17 @@ fun Links(st: UiState) {
         if (st.servers.isEmpty()) Text("انسخ رابط سيرفر ثم اضغط «لصق من الحافظة».", color = Dim)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             itemsIndexed(st.servers) { i, s ->
-                Row(Modifier.fillMaxWidth().border(1.dp, if (i == st.selected) Red else DeepRed, RoundedCornerShape(14.dp))
+                val selected = i == st.selected
+                Row(Modifier.fillMaxWidth()
+                    .background(if (selected) Green.copy(alpha = 0.10f) else Color.Transparent, RoundedCornerShape(14.dp))
+                    .border(if (selected) 2.dp else 1.dp, if (selected) Green else DeepRed, RoundedCornerShape(14.dp))
                     .clickable { Vpn.select(ctx, i) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(s.name, color = TextPrimary, fontWeight = FontWeight.Bold, maxLines = 1)
                         Text("${s.host}:${s.port}", color = Dim, fontSize = 12.sp, maxLines = 1)
-                        Text(serverFormat(s), color = Red.copy(alpha = 0.9f), fontSize = 11.sp, maxLines = 1)
+                        Text(serverFormat(s), color = if (selected) Green else Red.copy(alpha = 0.9f), fontSize = 11.sp, maxLines = 1)
                     }
+                    if (selected) Icon(Icons.Filled.CheckCircle, "محدد", tint = Green, modifier = Modifier.size(25.dp))
                     IconButton(onClick = { editingIndex = i }) { Icon(Icons.Filled.Edit, "تعديل", tint = Blue) }
                     IconButton(onClick = { Vpn.remove(ctx, i) }) { Icon(Icons.Filled.Delete, null, tint = Dim) }
                 }
