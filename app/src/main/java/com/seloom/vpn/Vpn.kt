@@ -18,12 +18,14 @@ data class UiState(
     val connected: Boolean = false, val connecting: Boolean = false,
     val servers: List<Server> = emptyList(), val selected: Int = 0,
     val upKB: Long = 0, val downKB: Long = 0, val pingMs: Int = -1, val error: String? = null,
+    val totalUpKB: Long = 0, val totalDownKB: Long = 0,
     val excludedApps: Set<String> = emptySet(),
     val publicIp: String? = null, val countryName: String? = null,
     val countryCode: String? = null, val ipLoading: Boolean = false
 ) { val current get() = servers.getOrNull(selected) }
 
 object Vpn {
+    private const val DEFAULT_WARP = "wireguard://98qlf4cSnq2VMmonjeWZI1dS1994IzfbR%2FfRdG%2FiCoE%3D@engage.cloudflareclient.com:2408?address=172.16.0.2%2F32%2C2606%3A4700%3A110%3A8d70%3A8df1%3A6e3d%3A693b%3Aea40%2F128&publickey=bmXOC%2BF1FxEMF9dyiK2H5%2F1SUtzH0JuVo51h2wPfgyo%3D&privatekey=98qlf4cSnq2VMmonjeWZI1dS1994IzfbR%2FfRdG%2FiCoE%3D#seloom1warp"
     val state = MutableStateFlow(UiState())
     @Volatile var stopRequested = true
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -38,10 +40,12 @@ object Vpn {
 
     fun load(c: Context) {
         appContext = c.applicationContext
-        val raws = prefs(c).getString("links", "")!!.split("\u0001").filter { it.isNotBlank() }
+        val stored = prefs(c).getString("links", "")!!.split("\u0001").filter { it.isNotBlank() }
+        val raws = if (stored.any { it.startsWith("wireguard://") }) stored else listOf(DEFAULT_WARP) + stored
         state.value = state.value.copy(servers = raws.mapNotNull(ConfigParser::parse),
             selected = prefs(c).getInt("sel", 0),
             excludedApps = prefs(c).getStringSet("excluded_apps", emptySet()).orEmpty().toSet())
+        if (raws != stored) save(c)
     }
 
     private fun save(c: Context) = prefs(c).edit()
@@ -112,7 +116,8 @@ object Vpn {
             .putString("active_config", config).apply()
         stopRequested = false
         state.value = state.value.copy(connected = false, connecting = true, error = null,
-            publicIp = null, countryName = null, countryCode = null, ipLoading = true)
+            publicIp = null, countryName = null, countryCode = null, ipLoading = true,
+            totalUpKB = 0, totalDownKB = 0)
         val intent = Intent(c, SingBoxService::class.java).putExtra("config", config)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) c.startForegroundService(intent)
         else c.startService(intent)
@@ -135,12 +140,15 @@ object Vpn {
         statsJob?.cancel()
         statsJob = scope.launch {
             val uid = Process.myUid(); var tx = TrafficStats.getUidTxBytes(uid); var rx = TrafficStats.getUidRxBytes(uid)
+            var totalTx = 0L; var totalRx = 0L
             launch { measurePing() }
             while (isActive) {
                 delay(1000)
                 val ntx = TrafficStats.getUidTxBytes(uid); val nrx = TrafficStats.getUidRxBytes(uid)
-                // نصف الحركة تقريباً: الحزم تُحسب داخل النفق وخارجه
-                state.value = state.value.copy(upKB = (ntx - tx) / 2048, downKB = (nrx - rx) / 2048)
+                val deltaTx = (ntx - tx).coerceAtLeast(0); val deltaRx = (nrx - rx).coerceAtLeast(0)
+                totalTx += deltaTx; totalRx += deltaRx
+                state.value = state.value.copy(upKB = deltaTx / 1024, downKB = deltaRx / 1024,
+                    totalUpKB = totalTx / 1024, totalDownKB = totalRx / 1024)
                 tx = ntx; rx = nrx
             }
         }

@@ -57,10 +57,10 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val Ink = Color(0xFF030304); private val Panel = Color(0xFF0D0507)
-private val Red = Color(0xFFFF1F2E); private val DeepRed = Color(0xFF6B0A14)
+private val Ink = Color(0xFFF6F7FF); private val Panel = Color(0xFFFFFFFF)
+private val Red = Color(0xFFFF176B); private val DeepRed = Color(0xFFE0D7EF)
 private val Green = Color(0xFF19E68C); private val Blue = Color(0xFF4D7CFF)
-private val Dim = Color(0xFFB4ADB0)
+private val Dim = Color(0xFF667085); private val TextPrimary = Color(0xFF17152B)
 private val Cut = CutCornerShape(14.dp)
 private data class InstalledApp(val packageName: String, val label: String, val icon: Drawable)
 
@@ -73,7 +73,7 @@ class MainActivity : ComponentActivity() {
         Vpn.load(this)
         setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                MaterialTheme(colorScheme = darkColorScheme(primary = Red, background = Ink, surface = Panel)) { App() }
+                MaterialTheme(colorScheme = lightColorScheme(primary = Red, background = Ink, surface = Panel, onBackground = TextPrimary, onSurface = TextPrimary)) { App() }
             }
         }
     }
@@ -151,7 +151,7 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
                 modifier = Modifier.size(28.dp).clickable(onClick = onSettings))
         }
         Hero()
-        Text("FUCK ASIACEEL & ZAIN", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Black,
+        Text("FUCK ASIACEEL & ZAIN", color = TextPrimary, fontSize = 19.sp, fontWeight = FontWeight.Black,
             letterSpacing = 1.sp, modifier = Modifier.align(Alignment.CenterHorizontally), maxLines = 1)
         Text("تباً لسياسة الاستخدام العادل", color = Red, fontSize = 13.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -170,7 +170,7 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text("السيرفر الحالي", color = Dim, fontSize = 10.sp)
-                        Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                        Text(name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                     }
                     Spacer(Modifier.width(8.dp)); Flag(st.countryCode)
                 }
@@ -178,7 +178,7 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text("التأخير", color = Dim, fontSize = 10.sp)
-                        Text(if (st.pingMs >= 0) "${st.pingMs} ms" else "— ms", color = Color.White, fontSize = 13.sp)
+                        Text(if (st.pingMs >= 0) "${st.pingMs} ms" else "— ms", color = TextPrimary, fontSize = 13.sp)
                     }
                     Spacer(Modifier.width(8.dp))
                     Box(Modifier.size(30.dp).background(DeepRed.copy(0.7f), CircleShape), contentAlignment = Alignment.Center) {
@@ -207,7 +207,7 @@ private fun ExitIpCard(st: UiState) {
         Icon(Icons.Filled.Public, null, tint = Red, modifier = Modifier.size(30.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text("عنوان IP عبر VPN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text("عنوان IP عبر VPN", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             Text(when {
                 st.publicIp != null -> st.publicIp
                 st.ipLoading && (st.connected || st.connecting) -> "جارٍ تحديد IP…"
@@ -217,7 +217,7 @@ private fun ExitIpCard(st: UiState) {
         }
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 8.dp)) {
             Text("الدولة", color = Dim, fontSize = 10.sp)
-            Text(st.countryName ?: "—", color = Color.White, fontSize = 12.sp, maxLines = 1)
+            Text(st.countryName ?: "—", color = TextPrimary, fontSize = 12.sp, maxLines = 1)
         }
         Flag(st.countryCode)
     }
@@ -260,7 +260,7 @@ fun PowerButton(st: UiState, onClick: () -> Unit) {
         drawCircle(Brush.radialGradient(listOf(powerColor.copy(if (on) 0.5f * glow else 0.18f), Color.Transparent)), size.minDimension * 0.62f)
     }.clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Box(Modifier.size(126.dp).border(3.dp, Color(0xFF2A2326), CircleShape).padding(6.dp)
-            .border(3.dp, powerColor, CircleShape).background(Color.Black, CircleShape), contentAlignment = Alignment.Center) {
+            .border(3.dp, powerColor, CircleShape).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (st.connecting) CircularProgressIndicator(color = powerColor, modifier = Modifier.size(38.dp), strokeWidth = 3.dp)
                 else Icon(Icons.Filled.PowerSettingsNew, null, tint = powerColor, modifier = Modifier.size(42.dp))
@@ -280,7 +280,7 @@ fun Speed(icon: ImageVector, c: Color, kb: Long, label: String) = Row(verticalAl
             val display = if (kb >= 1000) "%.1f".format(kb / 1000f) else kb.toString()
             val unit = if (kb >= 1000) " MB/s" else " KB/s"
             Text(display, color = c, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            Text(unit, color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(bottom = 3.dp))
+            Text(unit, color = TextPrimary, fontSize = 10.sp, modifier = Modifier.padding(bottom = 3.dp))
         }
         Text(label, color = Dim, fontSize = 11.sp)
     }
@@ -319,7 +319,7 @@ fun InfoCard(m: Modifier, icon: ImageVector, title: String, value: String, vc: C
         Icon(icon, null, tint = Red, modifier = Modifier.size(30.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
+            Text(title, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
             Text(value, color = vc, fontSize = 13.sp, maxLines = 1)
         }
         Icon(Icons.Filled.ChevronRight, null, tint = Dim)
@@ -330,7 +330,7 @@ fun Links(st: UiState) {
     val ctx = LocalContext.current
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Text("إدارة الروابط", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("إدارة الروابط", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
         Text("VLESS · VMess · Trojan · WireGuard", color = Dim, fontSize = 13.sp)
         Spacer(Modifier.height(14.dp))
         Button(onClick = {
@@ -348,7 +348,7 @@ fun Links(st: UiState) {
                 Row(Modifier.fillMaxWidth().border(1.dp, if (i == st.selected) Red else DeepRed, RoundedCornerShape(14.dp))
                     .clickable { Vpn.select(ctx, i) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(s.name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text(s.name, color = TextPrimary, fontWeight = FontWeight.Bold, maxLines = 1)
                         Text("${s.host}:${s.port}", color = Dim, fontSize = 12.sp, maxLines = 1)
                         Text(serverFormat(s), color = Red.copy(alpha = 0.9f), fontSize = 11.sp, maxLines = 1)
                     }
@@ -445,7 +445,7 @@ private fun VlessEditDialog(index: Int, server: Server, ctx: Context, onDismiss:
                 EditField("بصمة uTLS مثل chrome", fingerprint) { fingerprint = it }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = insecure, onCheckedChange = { insecure = it })
-                    Text("السماح بالشهادة غير الموثوقة (allow insecure)", color = Color.White, fontSize = 12.sp)
+                    Text("السماح بالشهادة غير الموثوقة (allow insecure)", color = TextPrimary, fontSize = 12.sp)
                 }
                 EditField("Reality Public Key", realityKey) { realityKey = it }
                 EditField("Reality Short ID", realitySid) { realitySid = it }
@@ -476,13 +476,13 @@ private fun EditField(label: String, value: String, onValueChange: (String) -> U
 @Composable
 fun Empty(title: String, body: String) = Column(Modifier.fillMaxSize().padding(28.dp),
     verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-    Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+    Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
     Text(body, color = Dim, modifier = Modifier.padding(top = 8.dp).alpha(0.9f))
 }
 
 @Composable
 fun NavBar(sel: Int, onSel: (Int) -> Unit) {
-    val items = listOf("الرئيسية" to Icons.Filled.Home, "فحص السرعة" to Icons.Filled.Speed,
+    val items = listOf("الرئيسية" to Icons.Filled.Home, "استخدام البيانات" to Icons.Filled.DataUsage,
         "إعدادات" to Icons.Filled.Dashboard, "إدارة الروابط" to Icons.Filled.Link)
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp).panel().height(64.dp)) {
         items.forEachIndexed { i, (l, ic) ->
@@ -504,7 +504,7 @@ fun Footer() {
         verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
             Text("المطور", color = Dim, fontSize = 9.sp)
-            Text("@seloom1", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+            Text("@seloom1", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp,
                 modifier = Modifier.clickable { runCatching { links.openUri("https://t.me/seloom1") } })
         }
         Column(Modifier.weight(1.2f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -513,31 +513,54 @@ fun Footer() {
                 verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.AutoMirrored.Filled.Send, null, tint = Blue, modifier = Modifier.size(13.dp))
                 Spacer(Modifier.width(3.dp))
-                Text("@freevpsiraq", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("@freevpsiraq", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text("الحقوق محفوظة", color = Dim, fontSize = 9.sp)
-            Text("محمد 🇮🇶", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            Text("محمد 🇮🇶", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
         }
     }
 }
 
 @Composable
 fun SpeedScreen(st: UiState) = Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
-    Text("فحص السرعة", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
-    Text("قراءة الحركة من جهاز Android أثناء تشغيل النفق", color = Dim, fontSize = 13.sp)
+    Text("استخدام البيانات", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+    Text("إجمالي البيانات منذ بداية اتصال النفق الحالي", color = Dim, fontSize = 13.sp)
     Spacer(Modifier.height(18.dp))
     Column(Modifier.fillMaxWidth().panel().padding(18.dp)) {
-        Text(if (st.connected) "الاتصال نشط" else "الاتصال غير نشط",
-            color = if (st.connected) Green else Dim, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(14.dp))
-        Speed(Icons.Filled.ArrowUpward, Green, st.upKB, "رفع حالي")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(if (st.connected) "النفق نشط" else "النفق غير نشط",
+                color = if (st.connected) Green else Dim, fontWeight = FontWeight.Bold)
+            Text("منذ آخر اتصال", color = Dim, fontSize = 11.sp)
+        }
+        Spacer(Modifier.height(18.dp))
+        DataTotalCard(Icons.Filled.ArrowUpward, Green, st.totalUpKB, "إجمالي الرفع")
         Spacer(Modifier.height(12.dp))
-        Speed(Icons.Filled.ArrowDownward, Blue, st.downKB, "تنزيل حالي")
+        DataTotalCard(Icons.Filled.ArrowDownward, Blue, st.totalDownKB, "إجمالي التنزيل")
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = DeepRed)
         Spacer(Modifier.height(12.dp))
-        Text("زمن الاستجابة: ${if (st.pingMs >= 0) "${st.pingMs} ms" else "غير متاح"}", color = Color.White)
+        Text("زمن الاستجابة: ${if (st.pingMs >= 0) "${st.pingMs} ms" else "غير متاح"}", color = TextPrimary)
     }
+}
+
+@Composable
+private fun DataTotalCard(icon: ImageVector, color: Color, kb: Long, label: String) = Row(
+    Modifier.fillMaxWidth().background(color.copy(alpha = 0.08f), RoundedCornerShape(12.dp)).padding(12.dp),
+    verticalAlignment = Alignment.CenterVertically) {
+    Icon(icon, null, tint = color, modifier = Modifier.size(32.dp))
+    Spacer(Modifier.width(10.dp))
+    Column {
+        Text(formatData(kb), color = color, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+        Text(label, color = Dim, fontSize = 11.sp)
+    }
+}
+
+private fun formatData(kb: Long): String = when {
+    kb >= 1024 * 1024 -> "%.2f GB".format(kb / (1024f * 1024f))
+    kb >= 1024 -> "%.2f MB".format(kb / 1024f)
+    else -> "$kb KB"
 }
 
 @Composable
@@ -565,7 +588,7 @@ fun SettingsScreen(st: UiState) {
             .sortedWith(compareByDescending<InstalledApp> { it.packageName in selectedApps }.thenBy { it.label.lowercase() })
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
-        Text("الإعدادات", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("الإعدادات", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
         Text("إدارة التطبيق والسيرفرات المحفوظة", color = Dim, fontSize = 13.sp)
         Spacer(Modifier.height(18.dp))
         Column(Modifier.fillMaxWidth().panel().padding(18.dp)) {
@@ -573,13 +596,13 @@ fun SettingsScreen(st: UiState) {
             Text(if (st.connected) "متصل" else "غير متصل", color = if (st.connected) Green else Color.White,
                 fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
-            Text("السيرفرات المحفوظة: ${st.servers.size}", color = Color.White)
+            Text("السيرفرات المحفوظة: ${st.servers.size}", color = TextPrimary)
             Text("البروتوكولات: VLESS · VMess · Trojan · WireGuard", color = Dim, fontSize = 12.sp)
         }
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("سجل الاتصال والتشخيص", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("سجل الاتصال والتشخيص", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text("${diagnosticEntries.size}/100", color = Dim, fontSize = 11.sp)
         }
         Text("يسجل أحداث الاتصال وأسباب الفصل فقط، ولا يحفظ مفاتيح WireGuard أو إعدادات VLESS.",
@@ -592,7 +615,7 @@ fun SettingsScreen(st: UiState) {
                 diagnosticEntries.take(20).forEach { entry ->
                     Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
                         Text(DiagnosticLog.formatTime(entry.at), color = Blue, fontSize = 10.sp)
-                        Text(entry.message, color = Color.White, fontSize = 12.sp)
+                        Text(entry.message, color = TextPrimary, fontSize = 12.sp)
                     }
                     if (entry != diagnosticEntries.take(20).last())
                         HorizontalDivider(color = DeepRed.copy(alpha = 0.55f))
@@ -616,7 +639,7 @@ fun SettingsScreen(st: UiState) {
             }
         }
         Spacer(Modifier.height(14.dp))
-        Text("استثناء التطبيقات من VPN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("استثناء التطبيقات من VPN", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         Text("التطبيقات المختارة ستستخدم اتصال الهاتف المباشر.", color = Dim, fontSize = 12.sp)
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = {
@@ -650,7 +673,7 @@ fun SettingsScreen(st: UiState) {
                                     modifier = Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)))
                                 Spacer(Modifier.width(10.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(app.label, color = Color.White, maxLines = 1)
+                                    Text(app.label, color = TextPrimary, maxLines = 1)
                                     Text(if (isVpnApp) "مستثنى للحماية؛ فحص IP عبر وكيل النفق" else app.packageName,
                                         color = Dim, fontSize = 10.sp, maxLines = 1)
                                 }
