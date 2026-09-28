@@ -148,9 +148,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScene() {
 
 @Composable
 fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: () -> Unit) {
+    var showDeveloper by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Icon(Icons.Filled.Menu, null, tint = Color.White, modifier = Modifier.size(28.dp))
+            Icon(Icons.Filled.Menu, "معلومات المطور", tint = Color.White,
+                modifier = Modifier.size(28.dp).clickable { showDeveloper = true })
             Icon(Icons.Filled.Settings, null, tint = Color.White,
                 modifier = Modifier.size(28.dp).clickable(onClick = onSettings))
         }
@@ -204,6 +206,33 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
         Spacer(Modifier.height(10.dp))
         AppExclusionSection(st)
         Spacer(Modifier.height(8.dp))
+    }
+    if (showDeveloper) {
+        AlertDialog(
+            onDismissRequest = { showDeveloper = false },
+            title = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Image(painterResource(R.drawable.developer_avatar), contentDescription = "محمد",
+                        modifier = Modifier.size(112.dp).clip(CircleShape).border(3.dp, Red, CircleShape),
+                        contentScale = ContentScale.Crop)
+                    Spacer(Modifier.height(10.dp))
+                    Text("تجاوز حظر شبكات العراق", color = Red, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                }
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("المطور محمد 🇮🇶", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("معرف التلكرام: @seloom1", color = Blue, fontSize = 13.sp)
+                    Text("قناة التلكرام: @freevpsiraq", color = Blue, fontSize = 13.sp)
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showDeveloper = false }, colors = ButtonDefaults.buttonColors(containerColor = Red)) {
+                    Text("إغلاق")
+                }
+            }
+        )
     }
 }
 
@@ -438,21 +467,21 @@ fun Links(st: UiState) {
         }
         Spacer(Modifier.height(14.dp))
         if (st.servers.isEmpty()) Text("انسخ رابط سيرفر ثم اضغط «لصق من الحافظة».", color = Dim)
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             itemsIndexed(st.servers) { i, s ->
                 val selected = i == st.selected
                 Row(Modifier.fillMaxWidth()
                     .background(if (selected) Green.copy(alpha = 0.10f) else Color.Transparent, RoundedCornerShape(14.dp))
                     .border(if (selected) 2.dp else 1.dp, if (selected) Green else DeepRed, RoundedCornerShape(14.dp))
-                    .clickable { Vpn.select(ctx, i) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    .clickable { Vpn.select(ctx, i) }.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(s.name, color = TextPrimary, fontWeight = FontWeight.Bold, maxLines = 1)
-                        Text("${s.host}:${s.port}", color = Dim, fontSize = 12.sp, maxLines = 1)
-                        Text(serverFormat(s), color = if (selected) Green else Red.copy(alpha = 0.9f), fontSize = 11.sp, maxLines = 1)
+                        Text(s.name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
+                        Text("${s.host}:${s.port}", color = Dim, fontSize = 10.sp, maxLines = 1)
+                        Text(serverFormat(s), color = if (selected) Green else Red.copy(alpha = 0.9f), fontSize = 10.sp, maxLines = 1)
                     }
-                    if (selected) Icon(Icons.Filled.CheckCircle, "محدد", tint = Green, modifier = Modifier.size(25.dp))
-                    IconButton(onClick = { editingIndex = i }) { Icon(Icons.Filled.Edit, "تعديل", tint = Blue) }
-                    IconButton(onClick = { Vpn.remove(ctx, i) }) { Icon(Icons.Filled.Delete, null, tint = Dim) }
+                    if (selected) Icon(Icons.Filled.CheckCircle, "محدد", tint = Green, modifier = Modifier.size(21.dp))
+                    IconButton(onClick = { editingIndex = i }, modifier = Modifier.size(34.dp)) { Icon(Icons.Filled.Edit, "تعديل", tint = Blue, modifier = Modifier.size(19.dp)) }
+                    IconButton(onClick = { Vpn.remove(ctx, i) }, modifier = Modifier.size(34.dp)) { Icon(Icons.Filled.Delete, null, tint = Dim, modifier = Modifier.size(19.dp)) }
                 }
             }
         }
