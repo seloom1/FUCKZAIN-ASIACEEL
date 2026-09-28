@@ -1,0 +1,4 @@
+<resources><style name="Theme.Seloom" parent="android:Theme.Material.NoActionBar">
+<item name="android:windowBackground">#050506</item>
+<item name="android:statusBarColor">#050506</item>
+<item name="android:navigationBarColor">#050506</item></style></resources>
