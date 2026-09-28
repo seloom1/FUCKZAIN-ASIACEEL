@@ -29,9 +29,15 @@ object Vpn {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var statsJob: Job? = null
     private var ipJob: Job? = null
+    private var appContext: Context? = null
     private fun prefs(c: Context) = c.getSharedPreferences("vpn", 0)
 
+    private fun log(message: String) {
+        appContext?.let { DiagnosticLog.record(it, message) }
+    }
+
     fun load(c: Context) {
+        appContext = c.applicationContext
         val raws = prefs(c).getString("links", "")!!.split("\u0001").filter { it.isNotBlank() }
         state.value = state.value.copy(servers = raws.mapNotNull(ConfigParser::parse),
             selected = prefs(c).getInt("sel", 0),
@@ -94,7 +100,13 @@ object Vpn {
     }
 
     fun start(c: Context) {
-        val s = state.value.current ?: run { state.value = state.value.copy(error = "أضف رابطاً أولاً"); return }
+        appContext = c.applicationContext
+        val s = state.value.current ?: run {
+            log("فشل البدء: لا يوجد سيرفر محدد")
+            state.value = state.value.copy(error = "أضف رابطاً أولاً")
+            return
+        }
+        log("بدء الاتصال: ${s.protocol} — ${s.host}:${s.port}")
         val config = ConfigParser.buildConfig(s)
         c.getSharedPreferences("vpn_runtime", Context.MODE_PRIVATE).edit()
             .putString("active_config", config).apply()
@@ -107,6 +119,8 @@ object Vpn {
     }
 
     fun stop(c: Context) {
+        appContext = c.applicationContext
+        log("طلب فصل يدوي")
         stopRequested = true
         c.getSharedPreferences("vpn_runtime", Context.MODE_PRIVATE).edit().remove("active_config").apply()
         SingBoxService.stopNow()
@@ -115,6 +129,7 @@ object Vpn {
     }
 
     fun onConnected() {
+        log("تم تشغيل النفق بنجاح")
         state.value = state.value.copy(connected = true, connecting = false, ipLoading = true,
             publicIp = null, countryName = null, countryCode = null)
         statsJob?.cancel()
@@ -144,6 +159,7 @@ object Vpn {
     }
 
     fun onDisconnected(error: String? = null) {
+        log(if (error.isNullOrBlank()) "انقطع النفق" else "انقطع النفق بسبب: ${error.take(180)}")
         statsJob?.cancel()
         ipJob?.cancel()
         state.value = state.value.copy(connected = false, connecting = false, upKB = 0, downKB = 0,

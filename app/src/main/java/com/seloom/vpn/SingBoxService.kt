@@ -49,6 +49,7 @@ class SingBoxService : VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            DiagnosticLog.record(this, "استلام أمر إيقاف الخدمة")
             stopping = true
             Vpn.stopRequested = true
             shutdown()
@@ -57,6 +58,7 @@ class SingBoxService : VpnService() {
         val runtimePrefs = getSharedPreferences("vpn_runtime", MODE_PRIVATE)
         val config = intent?.getStringExtra("config") ?: runtimePrefs.getString("active_config", null)
             ?: return START_NOT_STICKY
+        DiagnosticLog.record(this, "بدء خدمة sing-box")
         runtimePrefs.edit().putString("active_config", config).apply()
         stopping = false
         Vpn.stopRequested = false
@@ -80,6 +82,7 @@ class SingBoxService : VpnService() {
                 service.start()
                 if (stopping || Vpn.stopRequested) shutdown() else Vpn.onConnected()
             } catch (e: Exception) {
+                DiagnosticLog.record(this, "خطأ sing-box: ${(e.message ?: "استثناء غير معروف").take(180)}")
                 if (!stopping) shutdown(e.message ?: "فشل الاتصال")
             }
         }.start()
@@ -88,6 +91,7 @@ class SingBoxService : VpnService() {
 
     @Synchronized
     private fun shutdown(error: String? = null) {
+        if (error != null) DiagnosticLog.record(this, "إغلاق الخدمة بسبب: ${error.take(180)}")
         stopping = true
         val pfd = tunPfd
         tunPfd = null

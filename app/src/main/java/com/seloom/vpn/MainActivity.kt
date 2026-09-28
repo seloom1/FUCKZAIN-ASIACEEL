@@ -548,6 +548,7 @@ fun SettingsScreen(st: UiState) {
     var appsLoading by remember { mutableStateOf(true) }
     var selectedApps by remember { mutableStateOf(st.excludedApps) }
     var appSearch by remember { mutableStateOf("") }
+    var diagnosticEntries by remember { mutableStateOf(DiagnosticLog.read(ctx)) }
     LaunchedEffect(ctx) {
         installedApps = withContext(Dispatchers.IO) {
             val pm = ctx.packageManager
@@ -574,6 +575,45 @@ fun SettingsScreen(st: UiState) {
             Spacer(Modifier.height(12.dp))
             Text("السيرفرات المحفوظة: ${st.servers.size}", color = Color.White)
             Text("البروتوكولات: VLESS · VMess · Trojan · WireGuard", color = Dim, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("سجل الاتصال والتشخيص", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("${diagnosticEntries.size}/100", color = Dim, fontSize = 11.sp)
+        }
+        Text("يسجل أحداث الاتصال وأسباب الفصل فقط، ولا يحفظ مفاتيح WireGuard أو إعدادات VLESS.",
+            color = Dim, fontSize = 12.sp)
+        Spacer(Modifier.height(8.dp))
+        Column(Modifier.fillMaxWidth().panel().padding(12.dp)) {
+            if (diagnosticEntries.isEmpty()) {
+                Text("لا توجد أحداث مسجلة بعد.", color = Dim, fontSize = 12.sp)
+            } else {
+                diagnosticEntries.take(20).forEach { entry ->
+                    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                        Text(DiagnosticLog.formatTime(entry.at), color = Blue, fontSize = 10.sp)
+                        Text(entry.message, color = Color.White, fontSize = 12.sp)
+                    }
+                    if (entry != diagnosticEntries.take(20).last())
+                        HorizontalDivider(color = DeepRed.copy(alpha = 0.55f))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { diagnosticEntries = DiagnosticLog.read(ctx) }, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.Refresh, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("تحديث")
+                }
+                OutlinedButton(onClick = {
+                    DiagnosticLog.clear(ctx)
+                    diagnosticEntries = emptyList()
+                }, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.DeleteSweep, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("مسح السجل")
+                }
+            }
         }
         Spacer(Modifier.height(14.dp))
         Text("استثناء التطبيقات من VPN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
