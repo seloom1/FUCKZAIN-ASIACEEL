@@ -2,6 +2,7 @@
 **/build/
 local.properties
 *.apk
+!artifacts/*.apk
 *.aab
 .idea/
 .DS_Store
