@@ -100,6 +100,9 @@ fun App() {
         else VpnService.prepare(ctx)?.let { permit.launch(it) } ?: Vpn.start(ctx)
     }
     Box(Modifier.fillMaxSize().background(Ink).drawBehind { drawScene() }.statusBarsPadding().navigationBarsPadding()) {
+        Image(painterResource(R.drawable.dashboard_bg), contentDescription = null,
+            modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alpha = 0.28f)
+        Box(Modifier.fillMaxSize().background(Ink.copy(alpha = 0.78f)))
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
                 when (tab) {
@@ -159,6 +162,8 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
         Spacer(Modifier.height(8.dp))
         ExitIpCard(st)
         Spacer(Modifier.height(12.dp))
+        AppExclusionSection(st)
+        Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).panel().padding(12.dp)) {
                 Speed(Icons.Filled.ArrowUpward, Green, st.upKB, "رفع")
@@ -196,6 +201,94 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
                     if (st.connected) "نشط" else "متوقف", if (st.connected) Green else Dim) {}
                 InfoCard(Modifier.weight(1f), Icons.AutoMirrored.Filled.Send, "البروتوكول",
                     st.current?.protocol ?: "—", Color.White, onProtocol)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppExclusionSection(st: UiState) {
+    val ctx = LocalContext.current
+    var showPicker by remember { mutableStateOf(false) }
+    var installedApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
+    var appsLoading by remember { mutableStateOf(true) }
+    var selectedApps by remember { mutableStateOf(st.excludedApps) }
+    var appSearch by remember { mutableStateOf("") }
+    LaunchedEffect(ctx) {
+        installedApps = withContext(Dispatchers.IO) {
+            val pm = ctx.packageManager
+            pm.getInstalledApplications(PackageManager.GET_META_DATA).map { info ->
+                val label = runCatching { pm.getApplicationLabel(info).toString() }.getOrDefault(info.packageName)
+                val icon = runCatching { pm.getApplicationIcon(info) }.getOrElse { pm.defaultActivityIcon }
+                InstalledApp(info.packageName, label, icon)
+            }.distinctBy { it.packageName }.sortedBy { it.label.lowercase() }
+        }
+        appsLoading = false
+    }
+    val visibleApps = remember(installedApps, appSearch, selectedApps) {
+        installedApps.filter { it.label.contains(appSearch, true) || it.packageName.contains(appSearch, true) }
+            .sortedWith(compareByDescending<InstalledApp> { it.packageName in selectedApps }.thenBy { it.label.lowercase() })
+    }
+    Column(Modifier.fillMaxWidth().panel().padding(12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("استثناء التطبيقات", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("التطبيقات المختارة تستخدم اتصال الهاتف المباشر", color = Dim, fontSize = 11.sp)
+            }
+            Text("${st.excludedApps.size}", color = Green, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = {
+            selectedApps = st.excludedApps
+            appSearch = ""
+            showPicker = !showPicker
+        }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Apps, null)
+            Spacer(Modifier.width(8.dp))
+            Text(if (showPicker) "إخفاء التطبيقات" else "اختيار التطبيقات")
+        }
+        if (showPicker) {
+            Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                OutlinedTextField(value = appSearch, onValueChange = { appSearch = it },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("بحث باسم التطبيق") })
+                Spacer(Modifier.height(8.dp))
+                when {
+                    appsLoading -> CircularProgressIndicator(color = Red, modifier = Modifier.align(Alignment.CenterHorizontally))
+                    visibleApps.isEmpty() -> Text("لم يتم العثور على تطبيقات.", color = Dim, modifier = Modifier.padding(12.dp))
+                    else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 300.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        items(visibleApps, key = { it.packageName }) { app ->
+                            val isVpnApp = app.packageName == ctx.packageName
+                            val icon = remember(app.packageName) { app.icon.toSmallImageBitmap() }
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = app.packageName in selectedApps, enabled = !isVpnApp,
+                                    onCheckedChange = { checked ->
+                                        selectedApps = if (checked) selectedApps + app.packageName else selectedApps - app.packageName
+                                    })
+                                Image(icon, contentDescription = app.label,
+                                    modifier = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)))
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(app.label, color = TextPrimary, maxLines = 1)
+                                    Text(if (isVpnApp) "مستثنى للحماية" else app.packageName,
+                                        color = Dim, fontSize = 10.sp, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = {
+                    Vpn.saveExcludedApps(ctx, selectedApps)
+                    showPicker = false
+                    if (st.connected || st.connecting) Vpn.start(ctx)
+                    Toast.makeText(ctx, "تم حفظ استثناءات التطبيقات", Toast.LENGTH_SHORT).show()
+                }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Red)) {
+                    Icon(Icons.Filled.Save, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("حفظ الاستثناءات")
+                }
             }
         }
     }
@@ -615,27 +708,7 @@ fun SpeedScreen(st: UiState) {
 @Composable
 fun SettingsScreen(st: UiState) {
     val ctx = LocalContext.current
-    var showAppPicker by remember { mutableStateOf(false) }
-    var installedApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
-    var appsLoading by remember { mutableStateOf(true) }
-    var selectedApps by remember { mutableStateOf(st.excludedApps) }
-    var appSearch by remember { mutableStateOf("") }
     var diagnosticEntries by remember { mutableStateOf(DiagnosticLog.read(ctx)) }
-    LaunchedEffect(ctx) {
-        installedApps = withContext(Dispatchers.IO) {
-            val pm = ctx.packageManager
-            pm.getInstalledApplications(PackageManager.GET_META_DATA).map { info ->
-                val label = runCatching { pm.getApplicationLabel(info).toString() }.getOrDefault(info.packageName)
-                val icon = runCatching { pm.getApplicationIcon(info) }.getOrElse { pm.defaultActivityIcon }
-                InstalledApp(info.packageName, label, icon)
-            }.distinctBy { it.packageName }.sortedBy { it.label.lowercase() }
-        }
-        appsLoading = false
-    }
-    val visibleApps = remember(installedApps, appSearch, selectedApps) {
-        installedApps.filter { it.label.contains(appSearch, true) || it.packageName.contains(appSearch, true) }
-            .sortedWith(compareByDescending<InstalledApp> { it.packageName in selectedApps }.thenBy { it.label.lowercase() })
-    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         Text("الإعدادات", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
         Text("إدارة التطبيق والسيرفرات المحفوظة", color = Dim, fontSize = 13.sp)
@@ -684,62 +757,6 @@ fun SettingsScreen(st: UiState) {
                     Icon(Icons.Filled.DeleteSweep, null)
                     Spacer(Modifier.width(6.dp))
                     Text("مسح السجل")
-                }
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        Text("استثناء التطبيقات من VPN", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Text("التطبيقات المختارة ستستخدم اتصال الهاتف المباشر.", color = Dim, fontSize = 12.sp)
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = {
-            selectedApps = st.excludedApps
-            appSearch = ""
-            showAppPicker = !showAppPicker
-        }, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Filled.Apps, null)
-            Spacer(Modifier.width(8.dp))
-            Text(if (showAppPicker) "إخفاء قائمة التطبيقات" else "اختيار التطبيقات (${st.excludedApps.size})")
-        }
-        if (showAppPicker) {
-            Column(Modifier.fillMaxWidth().panel().padding(12.dp)) {
-                OutlinedTextField(value = appSearch, onValueChange = { appSearch = it },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("بحث باسم التطبيق") })
-                Spacer(Modifier.height(8.dp))
-                when {
-                    appsLoading -> CircularProgressIndicator(color = Red, modifier = Modifier.align(Alignment.CenterHorizontally))
-                    visibleApps.isEmpty() -> Text("لم يتم العثور على تطبيقات.", color = Dim, modifier = Modifier.padding(12.dp))
-                    else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        items(visibleApps, key = { it.packageName }) { app ->
-                            val isVpnApp = app.packageName == ctx.packageName
-                            val icon = remember(app.packageName) { app.icon.toSmallImageBitmap() }
-                            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(checked = app.packageName in selectedApps, enabled = !isVpnApp,
-                                    onCheckedChange = { checked ->
-                                        selectedApps = if (checked) selectedApps + app.packageName else selectedApps - app.packageName
-                                    })
-                                Image(icon, contentDescription = app.label,
-                                    modifier = Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)))
-                                Spacer(Modifier.width(10.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(app.label, color = TextPrimary, maxLines = 1)
-                                    Text(if (isVpnApp) "مستثنى للحماية؛ فحص IP عبر وكيل النفق" else app.packageName,
-                                        color = Dim, fontSize = 10.sp, maxLines = 1)
-                                }
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                Button(onClick = {
-                    Vpn.saveExcludedApps(ctx, selectedApps)
-                    showAppPicker = false
-                    if (st.connected || st.connecting) Vpn.start(ctx)
-                    Toast.makeText(ctx, "تم حفظ إعدادات استثناء التطبيقات", Toast.LENGTH_SHORT).show()
-                }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Red)) {
-                    Icon(Icons.Filled.Save, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("حفظ الإعدادات")
                 }
             }
         }

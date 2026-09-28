@@ -147,7 +147,12 @@ object Vpn {
         statsJob = scope.launch {
             val uid = Process.myUid(); var tx = TrafficStats.getUidTxBytes(uid); var rx = TrafficStats.getUidRxBytes(uid)
             var totalTx = 0L; var totalRx = 0L
-            launch { measurePing() }
+            launch {
+                while (isActive) {
+                    measurePing()
+                    delay(4_000)
+                }
+            }
             while (isActive) {
                 delay(1000)
                 val ntx = TrafficStats.getUidTxBytes(uid); val nrx = TrafficStats.getUidRxBytes(uid)
@@ -197,30 +202,37 @@ object Vpn {
 
     /** Route the lookup through sing-box's loopback proxy while the app UID remains excluded from TUN. */
     private fun fetchExitLocation(): ExitLocation? {
-        var connection: HttpURLConnection? = null
         return try {
-            val localProxy = Proxy(Proxy.Type.HTTP,
-                InetSocketAddress("127.0.0.1", ConfigParser.IP_CHECK_PROXY_PORT))
-            connection = (URL("https://ipapi.co/json/").openConnection(localProxy) as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 8_000
-                readTimeout = 8_000
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("User-Agent", "FUCKZAIN-ASIACEEL Android")
-            }
-            if (connection.responseCode !in 200..299) return null
-            val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-            if (json.optBoolean("error", false)) return null
-            fun field(key: String) = json.optString(key).takeUnless { it.isBlank() || it == "null" }
+            // api4.ipify forces the result to IPv4; the previous generic endpoint
+            // could return a long IPv6 address on IPv6-preferred networks.
+            val ipJson = requestJson("https://api4.ipify.org?format=json") ?: return null
+            val ip = ipJson.optString("ip").takeIf { it.contains('.') } ?: return null
+            val geo = requestJson("https://ipapi.co/$ip/json/")
+            fun field(json: JSONObject?, key: String) = json?.optString(key)
+                ?.takeUnless { it.isBlank() || it == "null" }
             ExitLocation(
-                ip = field("ip"),
-                countryName = field("country_name"),
-                countryCode = field("country_code") ?: field("country")
+                ip = ip,
+                countryName = field(geo, "country_name"),
+                countryCode = field(geo, "country_code") ?: field(geo, "country")
             )
         } catch (_: Exception) {
             null
+        }
+    }
+
+    private fun requestJson(address: String): JSONObject? {
+        val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", ConfigParser.IP_CHECK_PROXY_PORT))
+        val connection = (URL(address).openConnection(proxy) as HttpURLConnection)
+        return try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 8_000
+            connection.readTimeout = 8_000
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("User-Agent", "FUCKZAIN-ASIACEEL Android")
+            if (connection.responseCode !in 200..299) null
+            else JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
         } finally {
-            connection?.disconnect()
+            connection.disconnect()
         }
     }
 
