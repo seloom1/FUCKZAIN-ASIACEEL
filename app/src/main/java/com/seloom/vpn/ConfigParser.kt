@@ -16,6 +16,7 @@ object ConfigParser {
     fun parse(raw: String): Server? = try {
         val r = raw.trim()
         when {
+            r.startsWith("wireguard://") -> wireguardUri(r)
             r.startsWith("edited://") -> {
                 val j = JSONObject(String(Base64.decode(r.removePrefix("edited://"), Base64.DEFAULT)))
                 Server(r, j.getString("name"), j.getString("protocol"), j.getString("host"),
@@ -24,7 +25,7 @@ object ConfigParser {
             r.startsWith("vless://") -> uri(r, "vless")
             r.startsWith("trojan://") -> uri(r, "trojan")
             r.startsWith("vmess://") -> vmess(r)
-            r.contains("[Interface]") -> wireguard(r)
+            r.contains("[Interface]") || r.contains("PrivateKey") -> wireguard(r)
             else -> null
         }
     } catch (e: Exception) { null }
@@ -83,6 +84,25 @@ object ConfigParser {
         tls(q, if (j.optString("tls") == "tls") "tls" else "none", host)?.let { o.put("tls", it) }
         transport(j.optString("net", "tcp"), j.optString("path"), j.optString("host"))?.let { o.put("transport", it) }
         return Server(raw, j.optString("ps").ifEmpty { "$host:$port" }, "VMESS", host, port, o)
+    }
+
+    private fun wireguardUri(raw: String): Server {
+        val u = URI(raw)
+        val q = (u.rawQuery ?: "").split("&").filter { it.contains("=") }
+            .associate { it.substringBefore("=") to dec(it.substringAfter("=")) }
+        val host = u.host; val port = u.port
+        val privateKey = u.userInfo?.let { dec(it) } ?: q["privatekey"] ?: ""
+        val publicKey = q["publickey"] ?: ""
+        val address = q["address"]?.split(",")?.map { it.trim() } ?: emptyList()
+        val o = JSONObject().put("type", "wireguard").put("tag", "proxy")
+            .put("server", host).put("server_port", port)
+            .put("local_address", JSONArray(address))
+            .put("private_key", privateKey)
+            .put("peer_public_key", publicKey)
+            .put("mtu", q["mtu"]?.toIntOrNull() ?: 1420)
+        q["presharedkey"]?.let { o.put("pre_shared_key", it) }
+        val name = u.rawFragment?.let { dec(it) } ?: "WireGuard $host"
+        return Server(raw, name, "WIREGUARD", host, port, o)
     }
 
     private fun wireguard(raw: String): Server {
