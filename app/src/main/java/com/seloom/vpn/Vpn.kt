@@ -67,6 +67,21 @@ object Vpn {
         return true
     }
 
+    fun editVless(c: Context, i: Int, name: String, host: String, port: Int, uuid: String, flow: String,
+                  security: String, sni: String, alpn: String, insecure: Boolean, fingerprint: String,
+                  realityPublicKey: String, realityShortId: String, transportType: String,
+                  pathOrService: String, transportHost: String): Boolean {
+        val current = state.value.servers.getOrNull(i) ?: return false
+        val updated = ConfigParser.editVless(current, name, host, port, uuid, flow, security, sni, alpn,
+            insecure, fingerprint, realityPublicKey, realityShortId, transportType, pathOrService, transportHost)
+            ?: return false
+        state.value = state.value.copy(servers = state.value.servers.mapIndexed { index, server ->
+            if (index == i) updated else server
+        })
+        save(c)
+        return true
+    }
+
     fun clearAll(c: Context) {
         state.value = state.value.copy(servers = emptyList(), selected = 0, error = null)
         save(c)

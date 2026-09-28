@@ -129,6 +129,51 @@ object ConfigParser {
         Server("edited://$encoded", finalName, protocol.uppercase(), host, port, updated)
     } catch (_: Exception) { null }
 
+    /** يبني نسخة VLESS جديدة مع كل حقول الاتصال التي يدعمها الرابط/Outbound. */
+    fun editVless(server: Server, name: String, host: String, port: Int, uuid: String, flow: String,
+                  security: String, sni: String, alpn: String, insecure: Boolean, fingerprint: String,
+                  realityPublicKey: String, realityShortId: String, transportType: String,
+                  pathOrService: String, transportHost: String): Server? {
+        return try {
+        if (host.isBlank() || uuid.isBlank() || port !in 1..65535) return null
+        val o = JSONObject(server.outbound.toString())
+            .put("type", "vless").put("server", host).put("server_port", port).put("uuid", uuid)
+        if (flow.isBlank()) o.remove("flow") else o.put("flow", flow)
+        val transport = transportType.trim().lowercase()
+        if (transport !in setOf("tcp", "ws", "grpc", "httpupgrade")) return null
+        if (transport == "tcp") o.remove("transport") else {
+            val t = JSONObject().put("type", transport)
+            when (transport) {
+                "ws", "httpupgrade" -> {
+                    t.put("path", pathOrService.ifBlank { "/" })
+                    if (transportHost.isNotBlank()) {
+                        if (transport == "ws") t.put("headers", JSONObject().put("Host", transportHost))
+                        else t.put("host", transportHost)
+                    }
+                }
+                "grpc" -> t.put("service_name", pathOrService)
+            }
+            o.put("transport", t)
+        }
+        val sec = security.trim().lowercase()
+        if (sec !in setOf("none", "tls", "reality")) return null
+        if (sec == "none") o.remove("tls") else {
+            val tls = JSONObject().put("enabled", true).put("server_name", sni.ifBlank { host })
+            if (alpn.isNotBlank()) tls.put("alpn", JSONArray(alpn.split(",").map { it.trim() }.filter { it.isNotBlank() }))
+            if (insecure) tls.put("insecure", true)
+            if (fingerprint.isNotBlank()) tls.put("utls", JSONObject().put("enabled", true).put("fingerprint", fingerprint))
+            if (sec == "reality") tls.put("reality", JSONObject().put("enabled", true)
+                .put("public_key", realityPublicKey).put("short_id", realityShortId))
+            o.put("tls", tls)
+        }
+        val finalName = name.trim().ifEmpty { "$host:$port" }
+        val rawJson = JSONObject().put("name", finalName).put("protocol", "VLESS")
+            .put("host", host).put("port", port).put("outbound", o.toString())
+        val encoded = Base64.encodeToString(rawJson.toString().toByteArray(), Base64.NO_WRAP)
+        Server("edited://$encoded", finalName, "VLESS", host, port, o)
+        } catch (_: Exception) { null }
+    }
+
     /** الإعداد الكامل لـ sing-box 1.10.x */
     fun buildConfig(s: Server): String {
         val dns = JSONObject()

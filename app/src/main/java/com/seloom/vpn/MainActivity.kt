@@ -374,6 +374,10 @@ private fun serverFormat(server: Server): String {
 
 @Composable
 private fun EditServerDialog(index: Int, server: Server, ctx: Context, onDismiss: () -> Unit) {
+    if (server.protocol == "VLESS") {
+        VlessEditDialog(index, server, ctx, onDismiss)
+        return
+    }
     var name by remember(server) { mutableStateOf(server.name) }
     var host by remember(server) { mutableStateOf(server.host) }
     var port by remember(server) { mutableStateOf(server.port.toString()) }
@@ -399,6 +403,74 @@ private fun EditServerDialog(index: Int, server: Server, ctx: Context, onDismiss
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
     )
+}
+
+@Composable
+private fun VlessEditDialog(index: Int, server: Server, ctx: Context, onDismiss: () -> Unit) {
+    val tls = server.outbound.optJSONObject("tls")
+    val reality = tls?.optJSONObject("reality")
+    val utls = tls?.optJSONObject("utls")
+    val transport = server.outbound.optJSONObject("transport")
+    val wsHeaders = transport?.optJSONObject("headers")
+    var name by remember(server) { mutableStateOf(server.name) }
+    var host by remember(server) { mutableStateOf(server.host) }
+    var port by remember(server) { mutableStateOf(server.port.toString()) }
+    var uuid by remember(server) { mutableStateOf(server.outbound.optString("uuid")) }
+    var flow by remember(server) { mutableStateOf(server.outbound.optString("flow")) }
+    var security by remember(server) { mutableStateOf(if (reality != null) "reality" else if (tls != null) "tls" else "none") }
+    var sni by remember(server) { mutableStateOf(tls?.optString("server_name", "") ?: "") }
+    var alpn by remember(server) { mutableStateOf(tls?.optJSONArray("alpn")?.let { a -> (0 until a.length()).joinToString(",") { a.optString(it) } } ?: "") }
+    var insecure by remember(server) { mutableStateOf(tls?.optBoolean("insecure", false) == true) }
+    var fingerprint by remember(server) { mutableStateOf(utls?.optString("fingerprint", "") ?: "") }
+    var realityKey by remember(server) { mutableStateOf(reality?.optString("public_key", "") ?: "") }
+    var realitySid by remember(server) { mutableStateOf(reality?.optString("short_id", "") ?: "") }
+    var transportType by remember(server) { mutableStateOf(transport?.optString("type", "tcp") ?: "tcp") }
+    var pathOrService by remember(server) { mutableStateOf(transport?.let { it.optString("path", it.optString("service_name", "/")) } ?: "/") }
+    var transportHost by remember(server) { mutableStateOf(wsHeaders?.optString("Host", "") ?: transport?.optString("host", "") ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تعديل كل إعدادات VLESS") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text("البيانات الأساسية", color = Red, fontWeight = FontWeight.Bold)
+                EditField("اسم السيرفر", name) { name = it }
+                EditField("IP أو النطاق", host) { host = it }
+                EditField("البورت", port) { port = it.filter(Char::isDigit) }
+                EditField("UUID", uuid) { uuid = it }
+                EditField("Flow (اختياري)", flow) { flow = it }
+                Text("الأمان والنقل", color = Red, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 5.dp))
+                EditField("الأمان: none أو tls أو reality", security) { security = it.lowercase() }
+                EditField("SNI / Server Name", sni) { sni = it }
+                EditField("ALPN مثل h2,http/1.1", alpn) { alpn = it }
+                EditField("بصمة uTLS مثل chrome", fingerprint) { fingerprint = it }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = insecure, onCheckedChange = { insecure = it })
+                    Text("السماح بالشهادة غير الموثوقة (allow insecure)", color = Color.White, fontSize = 12.sp)
+                }
+                EditField("Reality Public Key", realityKey) { realityKey = it }
+                EditField("Reality Short ID", realitySid) { realitySid = it }
+                Text("النقل", color = Red, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 5.dp))
+                EditField("النقل: tcp أو ws أو grpc أو httpupgrade", transportType) { transportType = it.lowercase() }
+                EditField("WS Path أو gRPC Service Name", pathOrService) { pathOrService = it }
+                EditField("Host Header / HTTP Host", transportHost) { transportHost = it }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val ok = Vpn.editVless(ctx, index, name, host.trim(), port.toIntOrNull() ?: -1, uuid.trim(), flow.trim(),
+                    security.trim(), sni.trim(), alpn.trim(), insecure, fingerprint.trim(), realityKey.trim(), realitySid.trim(),
+                    transportType.trim(), pathOrService, transportHost.trim())
+                if (ok) { Toast.makeText(ctx, "تم حفظ كل إعدادات VLESS", Toast.LENGTH_SHORT).show(); onDismiss() }
+                else Toast.makeText(ctx, "تحقق من IP والبورت وUUID والإعدادات", Toast.LENGTH_SHORT).show()
+            }) { Text("حفظ") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
+}
+
+@Composable
+private fun EditField(label: String, value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(value, onValueChange, label = { Text(label) }, singleLine = true, modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
