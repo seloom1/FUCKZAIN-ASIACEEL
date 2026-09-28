@@ -208,14 +208,21 @@ object ConfigParser {
 
     /** الإعداد الكامل لـ sing-box 1.10.x */
     fun buildConfig(s: Server): String {
+        // Resolve the proxy endpoint outside the tunnel so a hostname-based
+        // endpoint can be reached before the proxy is established. All other
+        // DNS queries use encrypted DNS over the proxy to avoid ISP DNS blocks.
+        val dnsRules = JSONArray()
+        if (s.host.isNotBlank()) {
+            dnsRules.put(JSONObject().put("domain", JSONArray().put(s.host))
+                .put("server", "local"))
+        }
         val dns = JSONObject()
             .put("servers", JSONArray()
-                // Same behavior as NetMod: resolve through the external network
-                // resolver instead of creating a DNS-over-proxy loop.
                 .put(JSONObject().put("tag", "local").put("address", "local").put("detour", "direct"))
                 .put(JSONObject().put("tag", "remote").put("address", "tls://1.1.1.1").put("detour", "proxy")))
+            .put("rules", dnsRules)
             .put("strategy", "ipv4_only")
-            .put("final", "local")
+            .put("final", "remote")
         val tun = JSONObject()
             .put("type", "tun").put("tag", "tun-in")
             .put("address", JSONArray().put("172.19.0.1/30"))
