@@ -57,9 +57,9 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val Ink = Color(0xFF05050B); private val Panel = Color(0xFF120B18)
-private val Red = Color(0xFFFF2D75); private val DeepRed = Color(0xFF5A1740)
-private val Green = Color(0xFF00F5A0); private val Blue = Color(0xFF5C7CFF)
+private val Ink = Color(0xFF020207); private val Panel = Color(0xFF16091F)
+private val Red = Color(0xFFFF1F8F); private val DeepRed = Color(0xFF8A1760)
+private val Green = Color(0xFF00FFB3); private val Blue = Color(0xFF6B7CFF)
 private val Dim = Color(0xFFB8AFC2); private val TextPrimary = Color(0xFFF8F4FF)
 private val Cut = CutCornerShape(14.dp)
 private data class InstalledApp(val packageName: String, val label: String, val icon: Drawable)
@@ -121,7 +121,8 @@ fun RtlBox(c: @Composable () -> Unit) = CompositionLocalProvider(LocalLayoutDire
 /** الخلفية: شبكة نقاط حمراء، برج، خطوط زوايا */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScene() {
     val w = size.width; val h = size.height
-    drawRect(Brush.radialGradient(listOf(Color(0x33FF1F2E), Color.Transparent), Offset(w / 2, h * 0.36f), w * 0.9f))
+    drawRect(Brush.radialGradient(listOf(Color(0x88FF1F8F), Color(0x221B5CFF), Color.Transparent), Offset(w * 0.50f, h * 0.34f), w * 0.95f))
+    drawRect(Brush.radialGradient(listOf(Color(0x553B21FF), Color.Transparent), Offset(w * 0.08f, h * 0.82f), w * 0.62f))
     val r = Random(7)
     val pts = List(30) { Offset(r.nextFloat() * w * 0.42f, r.nextFloat() * h * 0.26f) } +
         List(46) { Offset(w * (0.58f + r.nextFloat() * 0.42f), r.nextFloat() * h * 0.28f) }
@@ -260,7 +261,7 @@ fun PowerButton(st: UiState, onClick: () -> Unit) {
         drawCircle(Brush.radialGradient(listOf(powerColor.copy(if (on) 0.5f * glow else 0.18f), Color.Transparent)), size.minDimension * 0.62f)
     }.clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Box(Modifier.size(126.dp).border(3.dp, Color(0xFF2A2326), CircleShape).padding(6.dp)
-            .border(3.dp, powerColor, CircleShape).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+            .border(3.dp, powerColor, CircleShape).background(Color(0xFF090611), CircleShape), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (st.connecting) CircularProgressIndicator(color = powerColor, modifier = Modifier.size(38.dp), strokeWidth = 3.dp)
                 else Icon(Icons.Filled.PowerSettingsNew, null, tint = powerColor, modifier = Modifier.size(42.dp))
@@ -524,43 +525,87 @@ fun Footer() {
 }
 
 @Composable
-fun SpeedScreen(st: UiState) = Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
-    Text("استخدام البيانات", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-    Text("إجمالي البيانات منذ بداية اتصال النفق الحالي", color = Dim, fontSize = 13.sp)
-    Spacer(Modifier.height(18.dp))
-    Column(Modifier.fillMaxWidth().panel().padding(18.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(if (st.connected) "النفق نشط" else "النفق غير نشط",
-                color = if (st.connected) Green else Dim, fontWeight = FontWeight.Bold)
-            Text("منذ آخر اتصال", color = Dim, fontSize = 11.sp)
-        }
-        Spacer(Modifier.height(18.dp))
-        DataTotalCard(Icons.Filled.ArrowUpward, Green, st.totalUpKB, "إجمالي الرفع")
-        Spacer(Modifier.height(12.dp))
-        DataTotalCard(Icons.Filled.ArrowDownward, Blue, st.totalDownKB, "إجمالي التنزيل")
-        Spacer(Modifier.height(16.dp))
-        HorizontalDivider(color = DeepRed)
-        Spacer(Modifier.height(12.dp))
-        Text("زمن الاستجابة: ${if (st.pingMs >= 0) "${st.pingMs} ms" else "غير متاح"}", color = TextPrimary)
-    }
-}
-
-@Composable
 private fun DataTotalCard(icon: ImageVector, color: Color, kb: Long, label: String) = Row(
-    Modifier.fillMaxWidth().background(color.copy(alpha = 0.08f), RoundedCornerShape(12.dp)).padding(12.dp),
+    Modifier.fillMaxWidth().background(color.copy(alpha = 0.10f), RoundedCornerShape(12.dp)).padding(12.dp),
     verticalAlignment = Alignment.CenterVertically) {
     Icon(icon, null, tint = color, modifier = Modifier.size(32.dp))
     Spacer(Modifier.width(10.dp))
     Column {
-        Text(formatData(kb), color = color, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+        Text(UsageHistory.data(kb), color = color, fontWeight = FontWeight.Bold, fontSize = 24.sp)
         Text(label, color = Dim, fontSize = 11.sp)
     }
 }
 
-private fun formatData(kb: Long): String = when {
-    kb >= 1024 * 1024 -> "%.2f GB".format(kb / (1024f * 1024f))
-    kb >= 1024 -> "%.2f MB".format(kb / 1024f)
-    else -> "$kb KB"
+@Composable
+fun SpeedScreen(st: UiState) {
+    val ctx = LocalContext.current
+    var sessions by remember { mutableStateOf(UsageHistory.read(ctx)) }
+    LaunchedEffect(st.connected, st.totalUpKB, st.totalDownKB) {
+        sessions = UsageHistory.read(ctx)
+    }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+        Text("استخدام البيانات", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+        Text("الإجمالي الحالي وسجل كل جلسات الاتصال", color = Dim, fontSize = 13.sp)
+        Spacer(Modifier.height(18.dp))
+        Column(Modifier.fillMaxWidth().panel().padding(18.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(if (st.connected) "النفق نشط" else "النفق غير نشط",
+                    color = if (st.connected) Green else Dim, fontWeight = FontWeight.Bold)
+                Text("منذ آخر اتصال", color = Dim, fontSize = 11.sp)
+            }
+            Spacer(Modifier.height(18.dp))
+            DataTotalCard(Icons.Filled.ArrowUpward, Green, st.totalUpKB, "إجمالي الرفع")
+            Spacer(Modifier.height(12.dp))
+            DataTotalCard(Icons.Filled.ArrowDownward, Blue, st.totalDownKB, "إجمالي التنزيل")
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = DeepRed)
+            Spacer(Modifier.height(12.dp))
+            Text("زمن الاستجابة: ${if (st.pingMs >= 0) "${st.pingMs} ms" else "غير متاح"}", color = TextPrimary)
+        }
+        Spacer(Modifier.height(18.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            Column {
+                Text("سجل جلسات الاتصال", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("يحفظ وقت البدء والإيقاف وحجم البيانات لكل جلسة", color = Dim, fontSize = 11.sp)
+            }
+            Text("${sessions.size}/100", color = Red, fontSize = 11.sp)
+        }
+        Spacer(Modifier.height(8.dp))
+        Column(Modifier.fillMaxWidth().panel().padding(12.dp)) {
+            if (sessions.isEmpty()) {
+                Text("لا توجد جلسات مكتملة بعد.", color = Dim, fontSize = 12.sp)
+            } else {
+                sessions.take(20).forEachIndexed { index, session ->
+                    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(session.serverName, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                                maxLines = 1, modifier = Modifier.weight(1f))
+                            Text(session.protocol, color = Red, fontSize = 10.sp)
+                        }
+                        Text("بدء: ${UsageHistory.time(session.startedAt)}", color = Dim, fontSize = 10.sp)
+                        Text("إيقاف: ${UsageHistory.time(session.endedAt)}", color = Dim, fontSize = 10.sp)
+                        Text("رفع ${UsageHistory.data(session.uploadedKB)}  •  تنزيل ${UsageHistory.data(session.downloadedKB)}",
+                            color = if (session.downloadedKB > 0) Blue else Green, fontSize = 11.sp)
+                    }
+                    if (index < sessions.take(20).lastIndex) HorizontalDivider(color = DeepRed.copy(alpha = 0.7f))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { sessions = UsageHistory.read(ctx) }, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.Refresh, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("تحديث")
+                }
+                OutlinedButton(onClick = { UsageHistory.clear(ctx); sessions = emptyList() }, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.DeleteSweep, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("حذف السجل")
+                }
+            }
+        }
+    }
 }
 
 @Composable

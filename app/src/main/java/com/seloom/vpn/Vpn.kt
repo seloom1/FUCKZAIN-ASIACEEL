@@ -32,6 +32,9 @@ object Vpn {
     private var statsJob: Job? = null
     private var ipJob: Job? = null
     private var appContext: Context? = null
+    private var sessionStartedAt: Long? = null
+    private var sessionServerName = "—"
+    private var sessionProtocol = "—"
     private fun prefs(c: Context) = c.getSharedPreferences("vpn", 0)
 
     private fun log(message: String) {
@@ -135,6 +138,9 @@ object Vpn {
 
     fun onConnected() {
         log("تم تشغيل النفق بنجاح")
+        sessionStartedAt = System.currentTimeMillis()
+        sessionServerName = state.value.current?.name ?: "—"
+        sessionProtocol = state.value.current?.protocol ?: "—"
         state.value = state.value.copy(connected = true, connecting = false, ipLoading = true,
             publicIp = null, countryName = null, countryCode = null)
         statsJob?.cancel()
@@ -168,6 +174,19 @@ object Vpn {
 
     fun onDisconnected(error: String? = null) {
         log(if (error.isNullOrBlank()) "انقطع النفق" else "انقطع النفق بسبب: ${error.take(180)}")
+        sessionStartedAt?.let { startedAt ->
+            appContext?.let { context ->
+                UsageHistory.add(context, UsageSession(
+                    startedAt = startedAt,
+                    endedAt = System.currentTimeMillis(),
+                    serverName = sessionServerName,
+                    protocol = sessionProtocol,
+                    uploadedKB = state.value.totalUpKB,
+                    downloadedKB = state.value.totalDownKB
+                ))
+            }
+        }
+        sessionStartedAt = null
         statsJob?.cancel()
         ipJob?.cancel()
         state.value = state.value.copy(connected = false, connecting = false, upKB = 0, downKB = 0,
