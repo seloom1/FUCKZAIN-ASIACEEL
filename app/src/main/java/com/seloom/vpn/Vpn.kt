@@ -56,6 +56,17 @@ object Vpn {
             selected = 0); save(c)
     }
 
+    fun editServer(c: Context, i: Int, name: String, host: String, port: Int, format: String): Boolean {
+        if (host.isBlank() || port !in 1..65535 || format.isBlank()) return false
+        val current = state.value.servers.getOrNull(i) ?: return false
+        val updated = ConfigParser.edit(current, name, host, port, format) ?: return false
+        state.value = state.value.copy(servers = state.value.servers.mapIndexed { index, server ->
+            if (index == i) updated else server
+        })
+        save(c)
+        return true
+    }
+
     fun clearAll(c: Context) {
         state.value = state.value.copy(servers = emptyList(), selected = 0, error = null)
         save(c)

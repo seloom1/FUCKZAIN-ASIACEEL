@@ -16,6 +16,11 @@ object ConfigParser {
     fun parse(raw: String): Server? = try {
         val r = raw.trim()
         when {
+            r.startsWith("edited://") -> {
+                val j = JSONObject(String(Base64.decode(r.removePrefix("edited://"), Base64.DEFAULT)))
+                Server(r, j.getString("name"), j.getString("protocol"), j.getString("host"),
+                    j.getInt("port"), JSONObject(j.getString("outbound")))
+            }
             r.startsWith("vless://") -> uri(r, "vless")
             r.startsWith("trojan://") -> uri(r, "trojan")
             r.startsWith("vmess://") -> vmess(r)
@@ -95,6 +100,34 @@ object ConfigParser {
         kv["presharedkey"]?.let { o.put("pre_shared_key", it) }
         return Server(raw, "WireGuard $host", "WIREGUARD", host, port, o)
     }
+
+    fun edit(server: Server, name: String, host: String, port: Int, format: String): Server? = try {
+        val parts = format.trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+        val protocol = parts.firstOrNull()?.takeIf { it in setOf("vless", "vmess", "trojan", "wireguard") }
+            ?: server.protocol.lowercase()
+        val transportType = parts.firstOrNull { it in setOf("ws", "grpc", "httpupgrade", "tcp") }
+        val tlsEnabled = parts.any { it == "tls" || it == "reality" }
+        val updated = JSONObject(server.outbound.toString())
+            .put("type", protocol).put("server", host).put("server_port", port)
+        if (transportType != null && transportType != "tcp") {
+            val old = server.outbound.optJSONObject("transport")
+            val transport = JSONObject().put("type", transportType)
+            if (transportType == "ws" || transportType == "httpupgrade")
+                transport.put("path", old?.optString("path", "/") ?: "/")
+            if (transportType == "grpc")
+                transport.put("service_name", old?.optString("service_name", "") ?: "")
+            updated.put("transport", transport)
+        } else updated.remove("transport")
+        if (tlsEnabled) {
+            val oldTls = server.outbound.optJSONObject("tls")
+            updated.put("tls", (oldTls ?: JSONObject()).put("enabled", true).put("server_name", host))
+        } else updated.remove("tls")
+        val finalName = name.trim().ifEmpty { "$host:$port" }
+        val rawJson = JSONObject().put("name", finalName).put("protocol", protocol.uppercase())
+            .put("host", host).put("port", port).put("outbound", updated.toString())
+        val encoded = Base64.encodeToString(rawJson.toString().toByteArray(), Base64.NO_WRAP)
+        Server("edited://$encoded", finalName, protocol.uppercase(), host, port, updated)
+    } catch (_: Exception) { null }
 
     /** الإعداد الكامل لـ sing-box 1.10.x */
     fun buildConfig(s: Server): String {

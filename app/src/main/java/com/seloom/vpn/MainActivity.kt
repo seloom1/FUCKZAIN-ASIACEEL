@@ -277,8 +277,10 @@ fun Speed(icon: ImageVector, c: Color, kb: Long, label: String) = Row(verticalAl
     Spacer(Modifier.width(6.dp))
     Column {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text("%.1f".format(kb / 1024f), color = c, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            Text(" MB/s", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(bottom = 3.dp))
+            val display = if (kb >= 1000) "%.1f".format(kb / 1000f) else kb.toString()
+            val unit = if (kb >= 1000) " MB/s" else " KB/s"
+            Text(display, color = c, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text(unit, color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(bottom = 3.dp))
         }
         Text(label, color = Dim, fontSize = 11.sp)
     }
@@ -326,6 +328,7 @@ fun InfoCard(m: Modifier, icon: ImageVector, title: String, value: String, vc: C
 @Composable
 fun Links(st: UiState) {
     val ctx = LocalContext.current
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Text("إدارة الروابط", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Text("VLESS · VMess · Trojan · WireGuard", color = Dim, fontSize = 13.sp)
@@ -346,13 +349,56 @@ fun Links(st: UiState) {
                     .clickable { Vpn.select(ctx, i) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(s.name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                        Text("${s.protocol} · ${s.host}", color = Dim, fontSize = 12.sp, maxLines = 1)
+                        Text("${s.host}:${s.port}", color = Dim, fontSize = 12.sp, maxLines = 1)
+                        Text(serverFormat(s), color = Red.copy(alpha = 0.9f), fontSize = 11.sp, maxLines = 1)
                     }
+                    IconButton(onClick = { editingIndex = i }) { Icon(Icons.Filled.Edit, "تعديل", tint = Blue) }
                     IconButton(onClick = { Vpn.remove(ctx, i) }) { Icon(Icons.Filled.Delete, null, tint = Dim) }
                 }
             }
         }
     }
+    editingIndex?.let { index ->
+        st.servers.getOrNull(index)?.let { server ->
+            EditServerDialog(index, server, ctx, onDismiss = { editingIndex = null })
+        }
+    }
+}
+
+private fun serverFormat(server: Server): String {
+    val transport = server.outbound.optJSONObject("transport")?.optString("type")
+    val tls = server.outbound.optJSONObject("tls")?.optBoolean("enabled", false) == true
+    return listOf(server.protocol.lowercase(), transport, if (tls) "tls" else null)
+        .filterNotNull().joinToString(" ")
+}
+
+@Composable
+private fun EditServerDialog(index: Int, server: Server, ctx: Context, onDismiss: () -> Unit) {
+    var name by remember(server) { mutableStateOf(server.name) }
+    var host by remember(server) { mutableStateOf(server.host) }
+    var port by remember(server) { mutableStateOf(server.port.toString()) }
+    var format by remember(server) { mutableStateOf(serverFormat(server)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تعديل السيرفر") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("اسم السيرفر") }, singleLine = true)
+                OutlinedTextField(host, { host = it }, label = { Text("IP أو النطاق") }, singleLine = true)
+                OutlinedTextField(port, { port = it.filter(Char::isDigit) }, label = { Text("البورت") }, singleLine = true)
+                OutlinedTextField(format, { format = it }, label = { Text("الصيغة: vless ws tls أو ws") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                val ok = Vpn.editServer(ctx, index, name,
+                    host.trim(), port.toIntOrNull() ?: -1, format)
+                if (ok) { Toast.makeText(ctx, "تم تعديل السيرفر", Toast.LENGTH_SHORT).show(); onDismiss() }
+                else Toast.makeText(ctx, "تحقق من البيانات المدخلة", Toast.LENGTH_SHORT).show()
+            }) { Text("حفظ") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
+    )
 }
 
 @Composable
@@ -386,7 +432,7 @@ fun Footer() {
         verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
             Text("المطور", color = Dim, fontSize = 9.sp)
-            Text("seloom1", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+            Text("@seloom1", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp,
                 modifier = Modifier.clickable { runCatching { links.openUri("https://t.me/seloom1") } })
         }
         Column(Modifier.weight(1.2f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -400,7 +446,7 @@ fun Footer() {
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text("الحقوق محفوظة", color = Dim, fontSize = 9.sp)
-            Text("seloom1", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            Text("محمد 🇮🇶", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
         }
     }
 }
@@ -441,8 +487,9 @@ fun SettingsScreen(st: UiState) {
         }
         appsLoading = false
     }
-    val visibleApps = remember(installedApps, appSearch) {
+    val visibleApps = remember(installedApps, appSearch, selectedApps) {
         installedApps.filter { it.label.contains(appSearch, true) || it.packageName.contains(appSearch, true) }
+            .sortedWith(compareByDescending<InstalledApp> { it.packageName in selectedApps }.thenBy { it.label.lowercase() })
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         Text("الإعدادات", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -511,12 +558,6 @@ fun SettingsScreen(st: UiState) {
                     Text("حفظ الإعدادات")
                 }
             }
-        }
-        Spacer(Modifier.height(14.dp))
-        OutlinedButton(onClick = { Vpn.clearAll(ctx) }, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Filled.DeleteSweep, null)
-            Spacer(Modifier.width(8.dp))
-            Text("مسح السيرفرات المحفوظة")
         }
         Spacer(Modifier.height(14.dp))
         Text("لإضافة سيرفر: انسخ الرابط، ثم افتح «إدارة الروابط» واضغط «لصق من الحافظة». بعد اختيار السيرفر اضغط زر الاتصال من الرئيسية.",
