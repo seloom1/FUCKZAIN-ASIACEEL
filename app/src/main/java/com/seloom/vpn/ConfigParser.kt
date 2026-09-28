@@ -89,17 +89,27 @@ object ConfigParser {
     private fun wireguardUri(raw: String): Server {
         val u = URI(raw)
         val q = (u.rawQuery ?: "").split("&").filter { it.contains("=") }
-            .associate { it.substringBefore("=") to dec(it.substringAfter("=")) }
-        val host = u.host; val port = u.port
-        val privateKey = u.userInfo?.let { dec(it) } ?: q["privatekey"] ?: ""
-        val publicKey = q["publickey"] ?: ""
-        val address = q["address"]?.split(",")?.map { it.trim() } ?: emptyList()
+            .associate { dec(it.substringBefore("=")).lowercase() to dec(it.substringAfter("=")) }
+        val host = u.host ?: error("WireGuard endpoint host is missing")
+        val port = u.port.takeIf { it in 1..65535 } ?: 2408
+        // rawUserInfo is still percent-encoded. Decoding it exactly once avoids
+        // turning a literal '+' in a base64 key into a space (URLDecoder treats
+        // '+' as a form-space character). This was not an issue for the bundled
+        // WARP key, but breaks otherwise valid WireGuard links.
+        val privateKey = u.rawUserInfo?.let { dec(it) } ?: q["privatekey"] ?: q["private_key"] ?: ""
+        val publicKey = q["publickey"] ?: q["public_key"] ?: ""
+        require(privateKey.isNotBlank()) { "WireGuard private key is missing" }
+        require(publicKey.isNotBlank()) { "WireGuard peer public key is missing" }
+        // Match the working native WireGuard client: a valid interface address
+        // and a mobile-safe MTU are required defaults when the URI omits them.
+        val address = q["address"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            ?.takeIf { it.isNotEmpty() } ?: listOf("172.16.0.2/32")
         val o = JSONObject().put("type", "wireguard").put("tag", "proxy")
             .put("server", host).put("server_port", port)
             .put("local_address", JSONArray(address))
             .put("private_key", privateKey)
             .put("peer_public_key", publicKey)
-            .put("mtu", q["mtu"]?.toIntOrNull() ?: 1420)
+            .put("mtu", q["mtu"]?.toIntOrNull()?.takeIf { it >= 1280 } ?: 1280)
         q["presharedkey"]?.let { o.put("pre_shared_key", it) }
         val name = u.rawFragment?.let { dec(it) } ?: "WireGuard $host"
         return Server(raw, name, "WIREGUARD", host, port, o)
@@ -111,12 +121,14 @@ object ConfigParser {
             kv[l.substringBefore("=").trim().lowercase()] = l.substringAfter("=").trim() }
         val ep = kv.getValue("endpoint"); val host = ep.substringBeforeLast(":").trim('[', ']')
         val port = ep.substringAfterLast(":").toInt()
+        val address = kv["address"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            ?.takeIf { it.isNotEmpty() } ?: listOf("172.16.0.2/32")
         val o = JSONObject().put("type", "wireguard").put("tag", "proxy")
             .put("server", host).put("server_port", port)
-            .put("local_address", JSONArray(kv.getValue("address").split(",").map { it.trim() }))
+            .put("local_address", JSONArray(address))
             .put("private_key", kv.getValue("privatekey"))
             .put("peer_public_key", kv.getValue("publickey"))
-            .put("mtu", kv["mtu"]?.toIntOrNull() ?: 1420)
+            .put("mtu", kv["mtu"]?.toIntOrNull()?.takeIf { it >= 1280 } ?: 1280)
         kv["presharedkey"]?.let { o.put("pre_shared_key", it) }
         return Server(raw, "WireGuard $host", "WIREGUARD", host, port, o)
     }
