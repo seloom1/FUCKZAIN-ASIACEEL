@@ -57,10 +57,10 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val Ink = Color(0xFFF6F7FF); private val Panel = Color(0xFFFFFFFF)
-private val Red = Color(0xFFFF176B); private val DeepRed = Color(0xFFE0D7EF)
-private val Green = Color(0xFF19E68C); private val Blue = Color(0xFF4D7CFF)
-private val Dim = Color(0xFF667085); private val TextPrimary = Color(0xFF17152B)
+private val Ink = Color(0xFF05050B); private val Panel = Color(0xFF120B18)
+private val Red = Color(0xFFFF2D75); private val DeepRed = Color(0xFF5A1740)
+private val Green = Color(0xFF00F5A0); private val Blue = Color(0xFF5C7CFF)
+private val Dim = Color(0xFFB8AFC2); private val TextPrimary = Color(0xFFF8F4FF)
 private val Cut = CutCornerShape(14.dp)
 private data class InstalledApp(val packageName: String, val label: String, val icon: Drawable)
 
@@ -73,7 +73,7 @@ class MainActivity : ComponentActivity() {
         Vpn.load(this)
         setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                MaterialTheme(colorScheme = lightColorScheme(primary = Red, background = Ink, surface = Panel, onBackground = TextPrimary, onSurface = TextPrimary)) { App() }
+                MaterialTheme(colorScheme = darkColorScheme(primary = Red, background = Ink, surface = Panel, onBackground = TextPrimary, onSurface = TextPrimary)) { App() }
             }
         }
     }
