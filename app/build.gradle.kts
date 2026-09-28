@@ -4,7 +4,7 @@ android {
     compileSdk = 34
     defaultConfig {
         applicationId = "com.fuckZAINASI"; minSdk = 24; targetSdk = 34
-        versionCode = 1; versionName = "1.0"
+        versionCode = 2; versionName = "1.0.1"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
     buildTypes { release { isMinifyEnabled = true; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt")) } }

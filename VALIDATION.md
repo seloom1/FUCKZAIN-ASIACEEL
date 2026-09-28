@@ -7,8 +7,10 @@
 | `clean assembleDebug assembleRelease` | ناجح من بناء نظيف |
 | `:app:compileDebugKotlin` و`:app:compileReleaseKotlin` | ناجح؛ تحذيرات قديمة فقط من واجهات إشعار deprecated |
 | معرّف الحزمة في APK | `com.fuckZAINASI` |
+| رقم النسخة الجديدة | `versionName 1.0.1`، `versionCode 2` |
 | اسم التطبيق في APK | `FUCK ASIACEEL & ZAIN` |
 | توقيع APK التجريبي Debug | صالح؛ موقّع بمفتاح تطوير Android (v2) |
+| توقيع APK Release | غير موقّع لعدم وجود مفتاح إصدار خاص بالمالك؛ يلزم توقيعه قبل التثبيت كتوزيعة Release |
 | إذن عرض التطبيقات `QUERY_ALL_PACKAGES` | مضمّن |
 | ABI arm64-v8a وarmeabi-v7a | موجودان |
 | DNS للتطبيقات الممرّرة عبر VPN | الخيار الافتراضي `remote` (TLS إلى `1.1.1.1` عبر outbound الخادم)، واسم خادم VPN فقط يُحلّ عبر `local` لتفادي حلقة DNS |
