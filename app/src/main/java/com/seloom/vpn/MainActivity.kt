@@ -101,8 +101,8 @@ fun App() {
     }
     Box(Modifier.fillMaxSize().background(Ink).drawBehind { drawScene() }.statusBarsPadding().navigationBarsPadding()) {
         Image(painterResource(R.drawable.dashboard_bg), contentDescription = null,
-            modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alpha = 0.28f)
-        Box(Modifier.fillMaxSize().background(Ink.copy(alpha = 0.78f)))
+            modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alpha = 0.45f)
+        Box(Modifier.fillMaxSize().background(Ink.copy(alpha = 0.55f)))
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
                 when (tab) {
@@ -162,8 +162,6 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
         Spacer(Modifier.height(8.dp))
         ExitIpCard(st)
         Spacer(Modifier.height(12.dp))
-        AppExclusionSection(st)
-        Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).panel().padding(12.dp)) {
                 Speed(Icons.Filled.ArrowUpward, Green, st.upKB, "رفع")
@@ -203,6 +201,9 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
                     st.current?.protocol ?: "—", Color.White, onProtocol)
             }
         }
+        Spacer(Modifier.height(10.dp))
+        AppExclusionSection(st)
+        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -229,16 +230,16 @@ private fun AppExclusionSection(st: UiState) {
         installedApps.filter { it.label.contains(appSearch, true) || it.packageName.contains(appSearch, true) }
             .sortedWith(compareByDescending<InstalledApp> { it.packageName in selectedApps }.thenBy { it.label.lowercase() })
     }
-    Column(Modifier.fillMaxWidth().panel().padding(12.dp)) {
+    Column(Modifier.fillMaxWidth().panel().padding(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
-                Text("استثناء التطبيقات", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text("التطبيقات المختارة تستخدم اتصال الهاتف المباشر", color = Dim, fontSize = 11.sp)
+                Text("استثناء التطبيقات", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("تستخدم اتصال الهاتف المباشر", color = Dim, fontSize = 10.sp)
             }
-            Text("${st.excludedApps.size}", color = Green, fontWeight = FontWeight.Bold)
+            Text("${st.excludedApps.size}", color = Green, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(5.dp))
         OutlinedButton(onClick = {
             selectedApps = st.excludedApps
             appSearch = ""
@@ -246,7 +247,7 @@ private fun AppExclusionSection(st: UiState) {
         }, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.Apps, null)
             Spacer(Modifier.width(8.dp))
-            Text(if (showPicker) "إخفاء التطبيقات" else "اختيار التطبيقات")
+            Text(if (showPicker) "إخفاء التطبيقات" else "اختيار التطبيقات", fontSize = 12.sp)
         }
         if (showPicker) {
             Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
