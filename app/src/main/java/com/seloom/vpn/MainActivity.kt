@@ -58,7 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private val Ink = Color(0xFF020207); private val Panel = Color(0xFF16091F)
-private val Red = Color(0xFFFF1F8F); private val DeepRed = Color(0xFF8A1760)
+private val Red = Color(0xFFFF2638); private val DeepRed = Color(0xFF6B0A14)
 private val Green = Color(0xFF00FFB3); private val Blue = Color(0xFF6B7CFF)
 private val Dim = Color(0xFFB8AFC2); private val TextPrimary = Color(0xFFF8F4FF)
 private val Cut = CutCornerShape(14.dp)
@@ -121,7 +121,7 @@ fun RtlBox(c: @Composable () -> Unit) = CompositionLocalProvider(LocalLayoutDire
 /** الخلفية: شبكة نقاط حمراء، برج، خطوط زوايا */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScene() {
     val w = size.width; val h = size.height
-    drawRect(Brush.radialGradient(listOf(Color(0x88FF1F8F), Color(0x221B5CFF), Color.Transparent), Offset(w * 0.50f, h * 0.34f), w * 0.95f))
+    drawRect(Brush.radialGradient(listOf(Color(0x88FF2638), Color(0x221B5CFF), Color.Transparent), Offset(w * 0.50f, h * 0.34f), w * 0.95f))
     drawRect(Brush.radialGradient(listOf(Color(0x553B21FF), Color.Transparent), Offset(w * 0.08f, h * 0.82f), w * 0.62f))
     val r = Random(7)
     val pts = List(30) { Offset(r.nextFloat() * w * 0.42f, r.nextFloat() * h * 0.26f) } +

@@ -6,6 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -40,6 +44,7 @@ class SingBoxService : VpnService() {
     private var tunPfd: ParcelFileDescriptor? = null
     private var tunDupPfd: ParcelFileDescriptor? = null
     @Volatile private var stopping = false
+    private val interfaceCallbacks = mutableMapOf<InterfaceUpdateListener, ConnectivityManager.NetworkCallback>()
 
     override fun onCreate() {
         super.onCreate()
@@ -93,6 +98,11 @@ class SingBoxService : VpnService() {
     private fun shutdown(error: String? = null) {
         if (error != null) DiagnosticLog.record(this, "إغلاق الخدمة بسبب: ${error.take(180)}")
         stopping = true
+        val cm = getSystemService(ConnectivityManager::class.java)
+        synchronized(interfaceCallbacks) {
+            interfaceCallbacks.values.forEach { runCatching { cm?.unregisterNetworkCallback(it) } }
+            interfaceCallbacks.clear()
+        }
         val pfd = tunPfd
         tunPfd = null
         val dupPfd = tunDupPfd
@@ -116,6 +126,25 @@ class SingBoxService : VpnService() {
 
     override fun onRevoke() = shutdown()
     override fun onDestroy() { shutdown(); super.onDestroy() }
+
+    private fun networkCallback(listener: InterfaceUpdateListener) = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) = publishNetworkInterface(listener, network)
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) = publishNetworkInterface(listener, network)
+        override fun onLinkPropertiesChanged(network: Network, linkProperties: android.net.LinkProperties) {
+            publishNetworkInterface(listener, network, linkProperties.interfaceName)
+        }
+        override fun onLost(network: Network) {
+            runCatching { listener.updateDefaultInterface("", -1) }
+        }
+    }
+
+    private fun publishNetworkInterface(listener: InterfaceUpdateListener, network: Network, knownName: String? = null) {
+        if (stopping) return
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        val name = knownName ?: cm.getLinkProperties(network)?.interfaceName ?: return
+        val index = runCatching { java.net.NetworkInterface.getByName(name)?.index ?: -1 }.getOrDefault(-1)
+        if (index >= 0) runCatching { listener.updateDefaultInterface(name, index) }
+    }
 
     private fun notification(): Notification {
         val nm = getSystemService(NotificationManager::class.java)
@@ -172,8 +201,32 @@ class SingBoxService : VpnService() {
         // create its Linux netlink monitor in an ordinary application.
         override fun usePlatformDefaultInterfaceMonitor() = true
         override fun usePlatformInterfaceGetter() = false
-        override fun startDefaultInterfaceMonitor(l: InterfaceUpdateListener) {}
-        override fun closeDefaultInterfaceMonitor(l: InterfaceUpdateListener) {}
+        override fun startDefaultInterfaceMonitor(l: InterfaceUpdateListener) {
+            val cm = svc.getSystemService(ConnectivityManager::class.java) ?: return
+            synchronized(svc.interfaceCallbacks) {
+                if (svc.interfaceCallbacks.containsKey(l)) return
+                val callback = svc.networkCallback(l)
+                svc.interfaceCallbacks[l] = callback
+                runCatching {
+                    cm.registerNetworkCallback(
+                        NetworkRequest.Builder()
+                            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                            .build(),
+                        callback
+                    )
+                }.onFailure {
+                    svc.interfaceCallbacks.remove(l)
+                    Log.w("SeloomVPN", "Unable to monitor default network", it)
+                }
+            }
+        }
+        override fun closeDefaultInterfaceMonitor(l: InterfaceUpdateListener) {
+            val cm = svc.getSystemService(ConnectivityManager::class.java) ?: return
+            synchronized(svc.interfaceCallbacks) {
+                svc.interfaceCallbacks.remove(l)?.let { runCatching { cm.unregisterNetworkCallback(it) } }
+            }
+        }
         override fun getInterfaces(): NetworkInterfaceIterator = object : NetworkInterfaceIterator {
             override fun hasNext() = false
             override fun next() = NetworkInterface()
