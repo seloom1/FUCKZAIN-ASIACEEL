@@ -140,6 +140,8 @@ class SingBoxService : VpnService() {
             // adding the generated IPv6 ULA address with VpnService.Builder.
             b.addRoute("0.0.0.0", 0)
             b.addDnsServer(o.dnsServerAddress.value)
+            // Preserve the original working behavior: the VPN app's own UID must not loop into TUN.
+            b.addDisallowedApplication(svc.packageName)
             val excludedApps = svc.getSharedPreferences("vpn", Context.MODE_PRIVATE)
                 .getStringSet("excluded_apps", emptySet()).orEmpty()
             excludedApps.filter { it != svc.packageName }.forEach { packageName ->

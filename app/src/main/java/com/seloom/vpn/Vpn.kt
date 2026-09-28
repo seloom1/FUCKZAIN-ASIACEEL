@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.json.JSONObject
 import java.net.InetSocketAddress
 import java.net.HttpURLConnection
+import java.net.Proxy
 import java.net.Socket
 import java.net.URL
 
@@ -125,11 +126,13 @@ object Vpn {
 
     private data class ExitLocation(val ip: String?, val countryName: String?, val countryCode: String?)
 
-    /** The request is made after the TUN is active so the provider observes the VPN exit address. */
+    /** Route the lookup through sing-box's loopback proxy while the app UID remains excluded from TUN. */
     private fun fetchExitLocation(): ExitLocation? {
         var connection: HttpURLConnection? = null
         return try {
-            connection = (URL("https://ipapi.co/json/").openConnection() as HttpURLConnection).apply {
+            val localProxy = Proxy(Proxy.Type.HTTP,
+                InetSocketAddress("127.0.0.1", ConfigParser.IP_CHECK_PROXY_PORT))
+            connection = (URL("https://ipapi.co/json/").openConnection(localProxy) as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 8_000
                 readTimeout = 8_000

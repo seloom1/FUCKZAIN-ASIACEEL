@@ -11,6 +11,8 @@ data class Server(val raw: String, val name: String, val protocol: String,
 
 /** يحوّل روابط vless/vmess/trojan وملفات WireGuard إلى Outbound لـ sing-box */
 object ConfigParser {
+    const val IP_CHECK_PROXY_PORT = 20872
+
     fun parse(raw: String): Server? = try {
         val r = raw.trim()
         when {
@@ -111,17 +113,21 @@ object ConfigParser {
             // Android VpnService.Builder installs the routes; sing-box must not
             // start its Linux netlink route monitor on a regular Android app.
             .put("auto_route", false).put("stack", "gvisor").put("sniff", true)
+        val ipCheckProxy = JSONObject()
+            .put("type", "http").put("tag", "ip-check-in")
+            .put("listen", "127.0.0.1").put("listen_port", IP_CHECK_PROXY_PORT)
         val route = JSONObject()
             // Keep auto detection enabled so Platform.autoDetectInterfaceControl
             // protects sing-box sockets from looping back through the VPN.
             .put("auto_detect_interface", true).put("final", "proxy")
             .put("rules", JSONArray()
+                .put(JSONObject().put("inbound", JSONArray().put("ip-check-in")).put("outbound", "proxy"))
                 .put(JSONObject().put("network", "udp").put("port", 443).put("outbound", "block"))
                 .put(JSONObject().put("protocol", "dns").put("outbound", "dns-out")))
         return JSONObject()
             .put("log", JSONObject().put("level", "warn"))
             .put("dns", dns)
-            .put("inbounds", JSONArray().put(tun))
+            .put("inbounds", JSONArray().put(tun).put(ipCheckProxy))
             .put("outbounds", JSONArray().put(s.outbound)
                 .put(JSONObject().put("type", "direct").put("tag", "direct"))
                 .put(JSONObject().put("type", "dns").put("tag", "dns-out"))

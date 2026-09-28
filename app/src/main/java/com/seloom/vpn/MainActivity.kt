@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -152,10 +153,11 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
         Hero()
         Text("FUCK ASIACEEL & ZAIN", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Black,
             letterSpacing = 1.sp, modifier = Modifier.align(Alignment.CenterHorizontally), maxLines = 1)
-        Text("حرية تصفح .. بلا حدود", color = Color.White, fontSize = 14.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
         Text("تباً لسياسة الاستخدام العادل", color = Red, fontSize = 13.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally))
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(8.dp))
+        ExitIpCard(st)
+        Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).panel().padding(12.dp)) {
                 Speed(Icons.Filled.ArrowUpward, Green, st.upKB, "رفع")
@@ -186,7 +188,7 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
             }
         }
         st.error?.let { Text(it, color = Red, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp).align(Alignment.CenterHorizontally)) }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
         Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             Row(Modifier.fillMaxWidth().panel().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 InfoCard(Modifier.weight(1f), Icons.Filled.Shield, "حماية الإنترنت",
@@ -194,43 +196,58 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
                 InfoCard(Modifier.weight(1f), Icons.AutoMirrored.Filled.Send, "البروتوكول",
                     st.current?.protocol ?: "—", Color.White, onProtocol)
             }
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp).panel().padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Public, null, tint = Red, modifier = Modifier.size(30.dp))
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("عنوان IP عبر VPN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text(when {
-                        st.publicIp != null -> st.publicIp
-                        st.ipLoading && (st.connected || st.connecting) -> "جارٍ تحديد IP…"
-                        st.connected -> "تعذر تحديد IP"
-                        else -> "اتصل بالـVPN لعرضه"
-                    }, color = Dim, fontSize = 12.sp, maxLines = 1)
-                }
-                Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 8.dp)) {
-                    Text("الدولة", color = Dim, fontSize = 10.sp)
-                    Text(st.countryName ?: "—", color = Color.White, fontSize = 12.sp, maxLines = 1)
-                }
-                Flag(st.countryCode)
-            }
         }
     }
 }
 
 @Composable
-fun Hero() = Box(Modifier.fillMaxWidth().height(120.dp)) {
-    Canvas(Modifier.fillMaxSize()) {
-        val cx = size.width * 0.72f; val bot = size.height * 0.95f; val top = size.height * 0.04f
-        for (i in 0..4) {
-            val k = i * 11f
-            val path = Path().apply {
-                moveTo(cx - 60f - k, bot); lineTo(cx - 6f, top + k * 0.5f); lineTo(cx + 6f, top + k * 0.5f); lineTo(cx + 60f + k, bot)
-            }
-            drawPath(path, Red.copy(0.9f - i * 0.17f), style = Stroke(2.5f))
+private fun ExitIpCard(st: UiState) {
+    Row(Modifier.fillMaxWidth().panel().padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Filled.Public, null, tint = Red, modifier = Modifier.size(30.dp))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text("عنوان IP عبر VPN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(when {
+                st.publicIp != null -> st.publicIp
+                st.ipLoading && (st.connected || st.connecting) -> "جارٍ تحديد IP…"
+                st.connected -> "تعذر تحديد IP"
+                else -> "اتصل بالـVPN لعرضه"
+            }, color = Dim, fontSize = 12.sp, maxLines = 1)
         }
+        Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 8.dp)) {
+            Text("الدولة", color = Dim, fontSize = 10.sp)
+            Text(st.countryName ?: "—", color = Color.White, fontSize = 12.sp, maxLines = 1)
+        }
+        Flag(st.countryCode)
     }
-    Image(painterResource(R.drawable.asiacell_red_logo), "Asiacell RED", contentScale = ContentScale.Fit,
-        modifier = Modifier.align(Alignment.CenterStart).padding(start = 36.dp).height(104.dp))
+}
+
+@Composable
+fun Hero() = Row(Modifier.fillMaxWidth().height(102.dp).panel().padding(8.dp),
+    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+    BrandLogoTile(Modifier.weight(1f).fillMaxHeight(), R.drawable.asiacell_red_logo, "ASIACELL RED", Red)
+    Column(Modifier.width(38.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(27.dp).background(DeepRed.copy(alpha = 0.65f), CircleShape), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.Link, null, tint = Color.White, modifier = Modifier.size(17.dp))
+        }
+        Text("VPN", color = Dim, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+    }
+    BrandLogoTile(Modifier.weight(1f).fillMaxHeight(), R.drawable.zain_logo_white, "ZAIN", Color(0xFFA78BFA))
+}
+
+@Composable
+private fun BrandLogoTile(modifier: Modifier, imageRes: Int, label: String, accent: Color) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(modifier.clip(shape)
+        .background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.18f), Panel)))
+        .border(1.dp, accent.copy(alpha = 0.48f), shape)
+        .padding(horizontal = 8.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Image(painterResource(imageRes), contentDescription = label,
+            modifier = Modifier.fillMaxWidth().weight(1f), contentScale = ContentScale.Fit)
+        Text(label, color = accent, fontWeight = FontWeight.Bold, fontSize = 9.sp, letterSpacing = 0.6.sp, maxLines = 1)
+    }
 }
 
 @Composable
@@ -238,15 +255,16 @@ fun PowerButton(st: UiState, onClick: () -> Unit) {
     val glow by rememberInfiniteTransition(label = "g").animateFloat(0.55f, 1f,
         infiniteRepeatable(tween(1400), RepeatMode.Reverse), label = "a")
     val on = st.connected
+    val powerColor = if (on) Green else Red
     Box(Modifier.padding(horizontal = 4.dp).size(132.dp).drawBehind {
-        drawCircle(Brush.radialGradient(listOf(Red.copy(if (on) 0.5f * glow else 0.18f), Color.Transparent)), size.minDimension * 0.62f)
+        drawCircle(Brush.radialGradient(listOf(powerColor.copy(if (on) 0.5f * glow else 0.18f), Color.Transparent)), size.minDimension * 0.62f)
     }.clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Box(Modifier.size(126.dp).border(3.dp, Color(0xFF2A2326), CircleShape).padding(6.dp)
-            .border(3.dp, Red, CircleShape).background(Color.Black, CircleShape), contentAlignment = Alignment.Center) {
+            .border(3.dp, powerColor, CircleShape).background(Color.Black, CircleShape), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (st.connecting) CircularProgressIndicator(color = Red, modifier = Modifier.size(38.dp), strokeWidth = 3.dp)
-                else Icon(Icons.Filled.PowerSettingsNew, null, tint = Red, modifier = Modifier.size(42.dp))
-                Text(if (on) "متصل" else if (st.connecting) "جارٍ الاتصال" else "اتصال", color = Red,
+                if (st.connecting) CircularProgressIndicator(color = powerColor, modifier = Modifier.size(38.dp), strokeWidth = 3.dp)
+                else Icon(Icons.Filled.PowerSettingsNew, null, tint = powerColor, modifier = Modifier.size(42.dp))
+                Text(if (on) "متصل" else if (st.connecting) "جارٍ الاتصال" else "متوقف", color = powerColor,
                     fontWeight = FontWeight.Bold, fontSize = 17.sp)
             }
         }
@@ -362,23 +380,28 @@ fun NavBar(sel: Int, onSel: (Int) -> Unit) {
 }
 
 @Composable
-fun Footer() = Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.Favorite, null, tint = Red, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(6.dp))
-        Column { Text("صمم من أجل", color = Dim, fontSize = 10.sp); Text("الحرية الرقمية", color = Dim, fontSize = 10.sp) }
-    }
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.WorkspacePremium, null, tint = Color.White, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(4.dp)); Text("FUCK ASIACEEL & ZAIN", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+fun Footer() {
+    val links = LocalUriHandler.current
+    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+            Text("المطور", color = Dim, fontSize = 9.sp)
+            Text("seloom1", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                modifier = Modifier.clickable { runCatching { links.openUri("https://t.me/seloom1") } })
         }
-        Text("All Rights Reserved", color = Dim, fontSize = 11.sp)
-    }
-    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-        Column(horizontalAlignment = Alignment.End) { Text("حقوق النشر محفوظة", color = Dim, fontSize = 10.sp); Text("FUCK ZAIN", color = Dim, fontSize = 10.sp) }
-        Spacer(Modifier.width(6.dp))
-        Box(Modifier.size(20.dp).border(1.5.dp, Red, CircleShape), contentAlignment = Alignment.Center) { Text("C", color = Red, fontSize = 10.sp) }
+        Column(Modifier.weight(1.2f), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("قناة تيليگرام", color = Dim, fontSize = 9.sp)
+            Row(Modifier.clickable { runCatching { links.openUri("https://t.me/freevpsiraq") } },
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.AutoMirrored.Filled.Send, null, tint = Blue, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(3.dp))
+                Text("@freevpsiraq", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+            Text("الحقوق محفوظة", color = Dim, fontSize = 9.sp)
+            Text("seloom1", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        }
     }
 }
 
@@ -469,7 +492,7 @@ fun SettingsScreen(st: UiState) {
                                 Spacer(Modifier.width(10.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(app.label, color = Color.White, maxLines = 1)
-                                    Text(if (isVpnApp) "يبقى ضمن النفق لفحص IP" else app.packageName,
+                                    Text(if (isVpnApp) "مستثنى للحماية؛ فحص IP عبر وكيل النفق" else app.packageName,
                                         color = Dim, fontSize = 10.sp, maxLines = 1)
                                 }
                             }
