@@ -756,12 +756,12 @@ fun SettingsScreen(st: UiState) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
-                    Text("حجب الإعلانات عبر DNS", color = TextPrimary, fontWeight = FontWeight.Bold)
-                    Text(if (st.adBlockingDnsEnabled) "مفعّل" else "متوقف",
-                        color = if (st.adBlockingDnsEnabled) Green else Dim, fontSize = 12.sp)
+                    Text("تفعيل DNS القديم", color = TextPrimary, fontWeight = FontWeight.Bold)
+                    Text(if (st.localDnsEnabled) "مفعّل" else "متوقف",
+                        color = if (st.localDnsEnabled) Green else Dim, fontSize = 12.sp)
                 }
-                Switch(checked = st.adBlockingDnsEnabled,
-                    onCheckedChange = { Vpn.setAdBlockingDnsEnabled(ctx, it) })
+                Switch(checked = st.localDnsEnabled,
+                    onCheckedChange = { Vpn.setLocalDnsEnabled(ctx, it) })
             }
         }
         Spacer(Modifier.height(14.dp))

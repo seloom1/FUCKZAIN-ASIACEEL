@@ -207,23 +207,21 @@ object ConfigParser {
     }
 
     /** الإعداد الكامل لـ sing-box 1.10.x */
-    fun buildConfig(s: Server, useAdBlockingDns: Boolean = false): String {
-        // Resolve the proxy endpoint locally to bootstrap the VPN. Regular DNS
-        // stays encrypted through the proxy; ad-block mode selects AdGuard DNS.
+    fun buildConfig(s: Server, useLocalDns: Boolean = false): String {
+        // When enabled, restore the original local-DNS behavior. Otherwise,
+        // resolve the proxy endpoint locally and send other lookups through TLS.
         val dnsRules = JSONArray()
-        if (s.host.isNotBlank()) {
+        if (!useLocalDns && s.host.isNotBlank()) {
             dnsRules.put(JSONObject().put("domain", JSONArray().put(s.host))
                 .put("server", "local"))
         }
         val dns = JSONObject()
             .put("servers", JSONArray()
                 .put(JSONObject().put("tag", "local").put("address", "local").put("detour", "direct"))
-                .put(JSONObject().put("tag", "remote").put("address", "tls://1.1.1.1").put("detour", "proxy"))
-                .put(JSONObject().put("tag", "adblock").put("address", "tls://dns.adguard-dns.com")
-                    .put("address_resolver", "local").put("detour", "proxy")))
+                .put(JSONObject().put("tag", "remote").put("address", "tls://1.1.1.1").put("detour", "proxy")))
             .put("rules", dnsRules)
             .put("strategy", "ipv4_only")
-            .put("final", if (useAdBlockingDns) "adblock" else "remote")
+            .put("final", if (useLocalDns) "local" else "remote")
         val tun = JSONObject()
             .put("type", "tun").put("tag", "tun-in")
             .put("address", JSONArray().put("172.19.0.1/30"))
