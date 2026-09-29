@@ -21,7 +21,8 @@ data class UiState(
     val totalUpKB: Long = 0, val totalDownKB: Long = 0,
     val excludedApps: Set<String> = emptySet(),
     val publicIp: String? = null, val countryName: String? = null,
-    val countryCode: String? = null, val ipLoading: Boolean = false
+    val countryCode: String? = null, val ipLoading: Boolean = false,
+    val localDnsEnabled: Boolean = false
 ) { val current get() = servers.getOrNull(selected) }
 
 object Vpn {
@@ -47,7 +48,8 @@ object Vpn {
         val raws = if (stored.any { it.startsWith("wireguard://") }) stored else listOf(DEFAULT_WARP) + stored
         state.value = state.value.copy(servers = raws.mapNotNull(ConfigParser::parse),
             selected = prefs(c).getInt("sel", 0),
-            excludedApps = prefs(c).getStringSet("excluded_apps", emptySet()).orEmpty().toSet())
+            excludedApps = prefs(c).getStringSet("excluded_apps", emptySet()).orEmpty().toSet(),
+            localDnsEnabled = prefs(c).getBoolean("local_dns_enabled", false))
         if (raws != stored) save(c)
     }
 
@@ -106,6 +108,11 @@ object Vpn {
         state.value = state.value.copy(excludedApps = safePackages)
     }
 
+    fun setLocalDnsEnabled(c: Context, enabled: Boolean) {
+        prefs(c).edit().putBoolean("local_dns_enabled", enabled).apply()
+        state.value = state.value.copy(localDnsEnabled = enabled)
+    }
+
     fun start(c: Context) {
         appContext = c.applicationContext
         val s = state.value.current ?: run {
@@ -114,7 +121,7 @@ object Vpn {
             return
         }
         log("بدء الاتصال: ${s.protocol} — ${s.host}:${s.port}")
-        val config = ConfigParser.buildConfig(s)
+        val config = ConfigParser.buildConfig(s, useLocalDns = state.value.localDnsEnabled)
         c.getSharedPreferences("vpn_runtime", Context.MODE_PRIVATE).edit()
             .putString("active_config", config).apply()
         stopRequested = false

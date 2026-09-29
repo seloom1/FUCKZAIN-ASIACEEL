@@ -752,6 +752,22 @@ fun SettingsScreen(st: UiState) {
             Text("البروتوكولات: VLESS · VMess · Trojan · WireGuard", color = Dim, fontSize = 12.sp)
         }
         Spacer(Modifier.height(14.dp))
+        Column(Modifier.fillMaxWidth().panel().padding(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    Text("DNS الشبكة المحلي القديم", color = TextPrimary, fontWeight = FontWeight.Bold)
+                    Text(if (st.localDnsEnabled) "مفعّل — قد تُحجب بعض المواقع" else "متوقف — DNS مشفّر عبر VPN",
+                        color = if (st.localDnsEnabled) Red else Green, fontSize = 12.sp)
+                }
+                Switch(checked = st.localDnsEnabled,
+                    onCheckedChange = { Vpn.setLocalDnsEnabled(ctx, it) })
+            }
+            Spacer(Modifier.height(6.dp))
+            Text("فعّله للرجوع إلى DNS الشبكة كما كان سابقاً؛ قد يحجب مزوّد الإنترنت بعض المواقع. يطبّق التغيير بعد فصل VPN وإعادة الاتصال.",
+                color = Dim, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
             Text("سجل الاتصال والتشخيص", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
