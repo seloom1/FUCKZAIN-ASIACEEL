@@ -756,16 +756,13 @@ fun SettingsScreen(st: UiState) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(Modifier.weight(1f)) {
-                    Text("DNS الشبكة المحلي القديم", color = TextPrimary, fontWeight = FontWeight.Bold)
-                    Text(if (st.localDnsEnabled) "مفعّل — قد تُحجب بعض المواقع" else "متوقف — DNS مشفّر عبر VPN",
-                        color = if (st.localDnsEnabled) Red else Green, fontSize = 12.sp)
+                    Text("حجب الإعلانات عبر DNS", color = TextPrimary, fontWeight = FontWeight.Bold)
+                    Text(if (st.adBlockingDnsEnabled) "مفعّل" else "متوقف",
+                        color = if (st.adBlockingDnsEnabled) Green else Dim, fontSize = 12.sp)
                 }
-                Switch(checked = st.localDnsEnabled,
-                    onCheckedChange = { Vpn.setLocalDnsEnabled(ctx, it) })
+                Switch(checked = st.adBlockingDnsEnabled,
+                    onCheckedChange = { Vpn.setAdBlockingDnsEnabled(ctx, it) })
             }
-            Spacer(Modifier.height(6.dp))
-            Text("فعّله للرجوع إلى DNS الشبكة كما كان سابقاً؛ قد يحجب مزوّد الإنترنت بعض المواقع. يطبّق التغيير بعد فصل VPN وإعادة الاتصال.",
-                color = Dim, fontSize = 12.sp)
         }
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,

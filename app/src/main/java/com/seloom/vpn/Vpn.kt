@@ -22,7 +22,7 @@ data class UiState(
     val excludedApps: Set<String> = emptySet(),
     val publicIp: String? = null, val countryName: String? = null,
     val countryCode: String? = null, val ipLoading: Boolean = false,
-    val localDnsEnabled: Boolean = false
+    val adBlockingDnsEnabled: Boolean = false
 ) { val current get() = servers.getOrNull(selected) }
 
 object Vpn {
@@ -32,6 +32,7 @@ object Vpn {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var statsJob: Job? = null
     private var ipJob: Job? = null
+    private var dnsRestartJob: Job? = null
     private var appContext: Context? = null
     private var sessionStartedAt: Long? = null
     private var sessionServerName = "—"
@@ -49,7 +50,8 @@ object Vpn {
         state.value = state.value.copy(servers = raws.mapNotNull(ConfigParser::parse),
             selected = prefs(c).getInt("sel", 0),
             excludedApps = prefs(c).getStringSet("excluded_apps", emptySet()).orEmpty().toSet(),
-            localDnsEnabled = prefs(c).getBoolean("local_dns_enabled", false))
+            adBlockingDnsEnabled = prefs(c).getBoolean("adblock_dns_enabled",
+                prefs(c).getBoolean("local_dns_enabled", false)))
         if (raws != stored) save(c)
     }
 
@@ -108,9 +110,18 @@ object Vpn {
         state.value = state.value.copy(excludedApps = safePackages)
     }
 
-    fun setLocalDnsEnabled(c: Context, enabled: Boolean) {
-        prefs(c).edit().putBoolean("local_dns_enabled", enabled).apply()
-        state.value = state.value.copy(localDnsEnabled = enabled)
+    fun setAdBlockingDnsEnabled(c: Context, enabled: Boolean) {
+        val restartRequired = state.value.connected || state.value.connecting || dnsRestartJob?.isActive == true
+        prefs(c).edit().putBoolean("adblock_dns_enabled", enabled).apply()
+        state.value = state.value.copy(adBlockingDnsEnabled = enabled)
+        dnsRestartJob?.cancel()
+        if (restartRequired) {
+            stop(c)
+            dnsRestartJob = scope.launch {
+                delay(800)
+                start(c.applicationContext)
+            }
+        }
     }
 
     fun start(c: Context) {
@@ -121,7 +132,7 @@ object Vpn {
             return
         }
         log("بدء الاتصال: ${s.protocol} — ${s.host}:${s.port}")
-        val config = ConfigParser.buildConfig(s, useLocalDns = state.value.localDnsEnabled)
+        val config = ConfigParser.buildConfig(s, useAdBlockingDns = state.value.adBlockingDnsEnabled)
         c.getSharedPreferences("vpn_runtime", Context.MODE_PRIVATE).edit()
             .putString("active_config", config).apply()
         stopRequested = false
