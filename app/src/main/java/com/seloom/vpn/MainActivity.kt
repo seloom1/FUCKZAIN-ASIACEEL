@@ -452,6 +452,7 @@ fun InfoCard(m: Modifier, icon: ImageVector, title: String, value: String, vc: C
 @Composable
 fun Links(st: UiState) {
     val ctx = LocalContext.current
+    val channelLinks = LocalUriHandler.current
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Text("إدارة الروابط", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
@@ -466,6 +467,15 @@ fun Links(st: UiState) {
             Icon(Icons.Filled.ContentPaste, null); Spacer(Modifier.width(8.dp)); Text("لصق من الحافظة")
         }
         Spacer(Modifier.height(14.dp))
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel)
+            .border(1.dp, DeepRed, RoundedCornerShape(12.dp))
+            .clickable { runCatching { channelLinks.openUri("https://t.me/freevpsiraq") } }
+            .padding(horizontal = 12.dp, vertical = 9.dp)) {
+            Text("للحصول على سيرفرات غير محدودة، انضم إلى قناة التلغرام", color = TextPrimary,
+                fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("@freevpsiraq · جميع الخطوط تُحدّث يومياً", color = Blue, fontSize = 11.sp)
+        }
+        Spacer(Modifier.height(10.dp))
         if (st.servers.isEmpty()) Text("انسخ رابط سيرفر ثم اضغط «لصق من الحافظة».", color = Dim)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             itemsIndexed(st.servers) { i, s ->
@@ -763,6 +773,21 @@ fun SettingsScreen(st: UiState) {
                 Switch(checked = st.localDnsEnabled,
                     onCheckedChange = { Vpn.setLocalDnsEnabled(ctx, it) })
             }
+        }
+        Spacer(Modifier.height(14.dp))
+        Column(Modifier.fillMaxWidth().panel().padding(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    Text("Bypass LAN route (VPN)", color = TextPrimary, fontWeight = FontWeight.Bold)
+                    Text(if (st.bypassLanRouteEnabled) "مفعّل" else "متوقف",
+                        color = if (st.bypassLanRouteEnabled) Green else Dim, fontSize = 12.sp)
+                }
+                Switch(checked = st.bypassLanRouteEnabled,
+                    onCheckedChange = { Vpn.setBypassLanRouteEnabled(ctx, it) })
+            }
+            Text("يسمح بالوصول إلى الراوتر والكاميرات وأجهزة الشبكة المحلية؛ عند تفعيله يستخدم مسارات IPv4 منفصلة دون مسار 0.0.0.0/0.",
+                color = Dim, fontSize = 12.sp)
         }
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,

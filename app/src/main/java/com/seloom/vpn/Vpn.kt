@@ -22,7 +22,8 @@ data class UiState(
     val excludedApps: Set<String> = emptySet(),
     val publicIp: String? = null, val countryName: String? = null,
     val countryCode: String? = null, val ipLoading: Boolean = false,
-    val localDnsEnabled: Boolean = false
+    val localDnsEnabled: Boolean = false,
+    val bypassLanRouteEnabled: Boolean = false
 ) { val current get() = servers.getOrNull(selected) }
 
 object Vpn {
@@ -32,7 +33,7 @@ object Vpn {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var statsJob: Job? = null
     private var ipJob: Job? = null
-    private var dnsRestartJob: Job? = null
+    private var settingsRestartJob: Job? = null
     private var appContext: Context? = null
     private var sessionStartedAt: Long? = null
     private var sessionServerName = "—"
@@ -51,7 +52,8 @@ object Vpn {
             selected = prefs(c).getInt("sel", 0),
             excludedApps = prefs(c).getStringSet("excluded_apps", emptySet()).orEmpty().toSet(),
             localDnsEnabled = prefs(c).getBoolean("local_dns_enabled",
-                prefs(c).getBoolean("adblock_dns_enabled", false)))
+                prefs(c).getBoolean("adblock_dns_enabled", false)),
+            bypassLanRouteEnabled = prefs(c).getBoolean("bypass_lan_route_enabled", false))
         if (raws != stored) save(c)
     }
 
@@ -111,13 +113,24 @@ object Vpn {
     }
 
     fun setLocalDnsEnabled(c: Context, enabled: Boolean) {
-        val restartRequired = state.value.connected || state.value.connecting || dnsRestartJob?.isActive == true
+        val restartRequired = state.value.connected || state.value.connecting || settingsRestartJob?.isActive == true
         prefs(c).edit().putBoolean("local_dns_enabled", enabled).apply()
         state.value = state.value.copy(localDnsEnabled = enabled)
-        dnsRestartJob?.cancel()
+        restartAfterSettingsChange(c, restartRequired)
+    }
+
+    fun setBypassLanRouteEnabled(c: Context, enabled: Boolean) {
+        val restartRequired = state.value.connected || state.value.connecting || settingsRestartJob?.isActive == true
+        prefs(c).edit().putBoolean("bypass_lan_route_enabled", enabled).apply()
+        state.value = state.value.copy(bypassLanRouteEnabled = enabled)
+        restartAfterSettingsChange(c, restartRequired)
+    }
+
+    private fun restartAfterSettingsChange(c: Context, restartRequired: Boolean) {
+        settingsRestartJob?.cancel()
         if (restartRequired) {
             stop(c)
-            dnsRestartJob = scope.launch {
+            settingsRestartJob = scope.launch {
                 delay(800)
                 start(c.applicationContext)
             }

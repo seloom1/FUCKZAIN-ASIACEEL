@@ -169,9 +169,12 @@ class SingBoxService : VpnService() {
             val b = svc.Builder().setSession("FUCK ASIACEEL & ZAIN").setMtu(o.mtu)
             val a4 = o.inet4Address
             while (a4.hasNext()) { val p = a4.next(); b.addAddress(p.address(), p.prefix()) }
-            // Keep the Android VPN profile IPv4-only. Some Android builds reject
-            // adding the generated IPv6 ULA address with VpnService.Builder.
-            b.addRoute("0.0.0.0", 0)
+            // Keep the Android VPN profile IPv4-only. In LAN-bypass mode, install
+            // split CIDR routes so private/link-local destinations use the LAN
+            // instead of sending all IPv4 traffic through a default VPN route.
+            val bypassLan = svc.getSharedPreferences("vpn", Context.MODE_PRIVATE)
+                .getBoolean("bypass_lan_route_enabled", false)
+            VpnRouteTable.routes(bypassLan).forEach { route -> b.addRoute(route.address, route.prefix) }
             b.addDnsServer(o.dnsServerAddress.value)
             // Preserve the original working behavior: the VPN app's own UID must not loop into TUN.
             b.addDisallowedApplication(svc.packageName)
