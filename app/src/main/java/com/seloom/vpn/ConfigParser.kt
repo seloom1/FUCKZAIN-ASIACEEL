@@ -207,9 +207,9 @@ object ConfigParser {
     }
 
     /** الإعداد الكامل لـ sing-box 1.10.x */
-    fun buildConfig(s: Server, useLocalDns: Boolean = false): String {
-        // When enabled, restore the original local-DNS behavior. Otherwise,
-        // resolve the proxy endpoint locally and send other lookups through TLS.
+    fun buildConfig(s: Server, useLocalDns: Boolean = true): String {
+        // Local DNS is the compatibility default because some mobile networks block
+        // DNS-over-TLS on port 853 when it is routed through the VPN proxy.
         val dnsRules = JSONArray()
         if (!useLocalDns && s.host.isNotBlank()) {
             dnsRules.put(JSONObject().put("domain", JSONArray().put(s.host))

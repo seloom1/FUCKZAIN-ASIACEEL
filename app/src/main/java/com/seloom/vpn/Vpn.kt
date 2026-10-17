@@ -24,6 +24,8 @@ data class UiState(
     val countryCode: String? = null, val ipLoading: Boolean = false,
     val localDnsEnabled: Boolean = false,
     val subscriptions: List<String> = emptyList(),
+    val manualServers: List<Server> = emptyList(),
+    val subscriptionServers: Map<String, List<Server>> = emptyMap(),
     val bypassLanRouteEnabled: Boolean = false
 ) { val current get() = servers.getOrNull(selected) }
 
@@ -54,6 +56,11 @@ object Vpn {
         appContext = c.applicationContext
         val preferences = prefs(c)
         val stored = preferences.getString("links", "").orEmpty().split("\u0001").filter { it.isNotBlank() }
+        val localDnsEnabled = if (!preferences.getBoolean("local_dns_default_migrated_v107", false)) {
+            preferences.edit().putBoolean("local_dns_enabled", true)
+                .putBoolean("local_dns_default_migrated_v107", true).apply()
+            true
+        } else preferences.getBoolean("local_dns_enabled", true)
         subscriptionLinks = decodeSubscriptions(preferences.getString("server_subscriptions", null))
         val subscribedRaw = subscriptionLinks.values.flatten().toSet()
         manualLinks = if (preferences.contains("manual_links")) {
@@ -66,9 +73,10 @@ object Vpn {
         state.value = state.value.copy(servers = servers,
             selected = preferences.getInt("sel", 0).coerceIn(0, (servers.size - 1).coerceAtLeast(0)),
             subscriptions = subscriptionLinks.keys.toList(),
+            manualServers = manualLinks.mapNotNull(ConfigParser::parse),
+            subscriptionServers = subscriptionLinks.mapValues { (_, links) -> links.mapNotNull(ConfigParser::parse) },
             excludedApps = prefs(c).getStringSet("excluded_apps", emptySet()).orEmpty().toSet(),
-            localDnsEnabled = prefs(c).getBoolean("local_dns_enabled",
-                prefs(c).getBoolean("adblock_dns_enabled", false)),
+            localDnsEnabled = localDnsEnabled,
             bypassLanRouteEnabled = prefs(c).getBoolean("bypass_lan_route_enabled", false))
         save(c)
     }
@@ -97,7 +105,9 @@ object Vpn {
         val selected = selectedRaw?.let { raw -> servers.indexOfFirst { it.raw == raw } }
             ?.takeIf { it >= 0 } ?: state.value.selected.coerceIn(0, (servers.size - 1).coerceAtLeast(0))
         state.value = state.value.copy(servers = servers, selected = selected,
-            subscriptions = subscriptionLinks.keys.toList())
+            subscriptions = subscriptionLinks.keys.toList(),
+            manualServers = manualLinks.mapNotNull(ConfigParser::parse),
+            subscriptionServers = subscriptionLinks.mapValues { (_, links) -> links.mapNotNull(ConfigParser::parse) })
         prefs(c).edit()
             .putString("links", raws.joinToString("\u0001"))
             .putString("manual_links", manualLinks.joinToString("\u0001"))
@@ -152,6 +162,7 @@ object Vpn {
         if (host.isBlank() || port !in 1..65535 || format.isBlank()) return false
         val current = state.value.servers.getOrNull(i) ?: return false
         val updated = ConfigParser.edit(current, name, host, port, format) ?: return false
+        replaceRaw(current.raw, updated.raw)
         state.value = state.value.copy(servers = state.value.servers.mapIndexed { index, server ->
             if (index == i) updated else server
         })
@@ -167,11 +178,19 @@ object Vpn {
         val updated = ConfigParser.editVless(current, name, host, port, uuid, flow, security, sni, alpn,
             insecure, fingerprint, realityPublicKey, realityShortId, transportType, pathOrService, transportHost)
             ?: return false
+        replaceRaw(current.raw, updated.raw)
         state.value = state.value.copy(servers = state.value.servers.mapIndexed { index, server ->
             if (index == i) updated else server
         })
         save(c)
         return true
+    }
+
+    private fun replaceRaw(oldRaw: String, newRaw: String) {
+        manualLinks = manualLinks.map { if (it == oldRaw) newRaw else it }
+        subscriptionLinks.keys.toList().forEach { url ->
+            subscriptionLinks[url] = subscriptionLinks[url].orEmpty().map { if (it == oldRaw) newRaw else it }
+        }
     }
 
     fun clearAll(c: Context) {
