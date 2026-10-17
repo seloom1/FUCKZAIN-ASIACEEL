@@ -44,6 +44,7 @@ class SingBoxService : VpnService() {
     private var tunPfd: ParcelFileDescriptor? = null
     private var tunDupPfd: ParcelFileDescriptor? = null
     @Volatile private var stopping = false
+    @Volatile private var shutdownComplete = false
     private val interfaceCallbacks = mutableMapOf<InterfaceUpdateListener, ConnectivityManager.NetworkCallback>()
 
     override fun onCreate() {
@@ -53,6 +54,7 @@ class SingBoxService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        shutdownComplete = false
         if (intent?.action == ACTION_STOP) {
             DiagnosticLog.record(this, "استلام أمر إيقاف الخدمة")
             stopping = true
@@ -96,6 +98,8 @@ class SingBoxService : VpnService() {
 
     @Synchronized
     private fun shutdown(error: String? = null) {
+        if (shutdownComplete) return
+        shutdownComplete = true
         if (error != null) DiagnosticLog.record(this, "إغلاق الخدمة بسبب: ${error.take(180)}")
         stopping = true
         val cm = getSystemService(ConnectivityManager::class.java)

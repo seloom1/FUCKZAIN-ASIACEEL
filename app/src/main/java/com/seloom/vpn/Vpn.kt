@@ -23,6 +23,7 @@ data class UiState(
     val publicIp: String? = null, val countryName: String? = null,
     val countryCode: String? = null, val ipLoading: Boolean = false,
     val localDnsEnabled: Boolean = false,
+    val subscriptions: List<String> = emptyList(),
     val bypassLanRouteEnabled: Boolean = false
 ) { val current get() = servers.getOrNull(selected) }
 
@@ -35,6 +36,11 @@ object Vpn {
     private var ipJob: Job? = null
     private var settingsRestartJob: Job? = null
     private var appContext: Context? = null
+    private var manualLinks: List<String> = emptyList()
+    private var subscriptionLinks: LinkedHashMap<String, List<String>> = linkedMapOf()
+    private var reconnectJob: Job? = null
+    private var reconnectAttempts = 0
+    @Volatile private var reconnectEnabled = false
     private var sessionStartedAt: Long? = null
     private var sessionServerName = "—"
     private var sessionProtocol = "—"
@@ -46,33 +52,100 @@ object Vpn {
 
     fun load(c: Context) {
         appContext = c.applicationContext
-        val stored = prefs(c).getString("links", "")!!.split("\u0001").filter { it.isNotBlank() }
-        val raws = if (stored.any { it.startsWith("wireguard://") }) stored else listOf(DEFAULT_WARP) + stored
-        state.value = state.value.copy(servers = raws.mapNotNull(ConfigParser::parse),
-            selected = prefs(c).getInt("sel", 0),
+        val preferences = prefs(c)
+        val stored = preferences.getString("links", "").orEmpty().split("\u0001").filter { it.isNotBlank() }
+        subscriptionLinks = decodeSubscriptions(preferences.getString("server_subscriptions", null))
+        val subscribedRaw = subscriptionLinks.values.flatten().toSet()
+        manualLinks = if (preferences.contains("manual_links")) {
+            preferences.getString("manual_links", "").orEmpty().split("\u0001").filter { it.isNotBlank() }
+        } else stored.filterNot { it in subscribedRaw }
+        if ((manualLinks + subscriptionLinks.values.flatten()).none { it.startsWith("wireguard://") })
+            manualLinks = listOf(DEFAULT_WARP) + manualLinks
+        val raws = (manualLinks + subscriptionLinks.values.flatten()).distinct()
+        val servers = raws.mapNotNull(ConfigParser::parse)
+        state.value = state.value.copy(servers = servers,
+            selected = preferences.getInt("sel", 0).coerceIn(0, (servers.size - 1).coerceAtLeast(0)),
+            subscriptions = subscriptionLinks.keys.toList(),
             excludedApps = prefs(c).getStringSet("excluded_apps", emptySet()).orEmpty().toSet(),
             localDnsEnabled = prefs(c).getBoolean("local_dns_enabled",
                 prefs(c).getBoolean("adblock_dns_enabled", false)),
             bypassLanRouteEnabled = prefs(c).getBoolean("bypass_lan_route_enabled", false))
-        if (raws != stored) save(c)
+        save(c)
     }
 
-    private fun save(c: Context) = prefs(c).edit()
-        .putString("links", state.value.servers.joinToString("\u0001") { it.raw })
-        .putInt("sel", state.value.selected).apply()
+    private fun encodeSubscriptions(): String {
+        val json = JSONObject()
+        subscriptionLinks.forEach { (url, links) -> json.put(url, org.json.JSONArray(links)) }
+        return json.toString()
+    }
+
+    private fun decodeSubscriptions(raw: String?): LinkedHashMap<String, List<String>> = runCatching {
+        val json = JSONObject(raw ?: "{}")
+        LinkedHashMap<String, List<String>>().apply {
+            json.keys().forEach { url ->
+                val array = json.optJSONArray(url) ?: return@forEach
+                val links = (0 until array.length()).mapNotNull { array.optString(it).takeIf(String::isNotBlank) }
+                if (links.isNotEmpty()) put(url, links)
+            }
+        }
+    }.getOrDefault(linkedMapOf())
+
+    private fun save(c: Context) {
+        val raws = (manualLinks + subscriptionLinks.values.flatten()).distinct()
+        val servers = raws.mapNotNull(ConfigParser::parse)
+        val selectedRaw = state.value.current?.raw
+        val selected = selectedRaw?.let { raw -> servers.indexOfFirst { it.raw == raw } }
+            ?.takeIf { it >= 0 } ?: state.value.selected.coerceIn(0, (servers.size - 1).coerceAtLeast(0))
+        state.value = state.value.copy(servers = servers, selected = selected,
+            subscriptions = subscriptionLinks.keys.toList())
+        prefs(c).edit()
+            .putString("links", raws.joinToString("\u0001"))
+            .putString("manual_links", manualLinks.joinToString("\u0001"))
+            .putString("server_subscriptions", encodeSubscriptions())
+            .putInt("sel", selected)
+            .apply()
+    }
 
     /** يضيف روابط من نص (سطر لكل رابط). يعيد عدد ما أُضيف. */
     fun import(c: Context, text: String): Int {
-        val chunks = if (text.contains("[Interface]")) listOf(text) else text.lines()
-        val added = chunks.mapNotNull(ConfigParser::parse)
-        state.value = state.value.copy(servers = state.value.servers + added)
-        save(c); return added.size
+        val candidates = SubscriptionParser.extract(text) + text.lines().filter { it.trim().startsWith("edited://") }
+        val added = candidates.distinct().filter { ConfigParser.parse(it) != null }
+        val known = (manualLinks + subscriptionLinks.values.flatten()).toSet()
+        val newLinks = added.filterNot { it in known }.distinct()
+        manualLinks = manualLinks + newLinks
+        save(c)
+        return newLinks.size
     }
 
-    fun select(c: Context, i: Int) { state.value = state.value.copy(selected = i); save(c) }
+    suspend fun updateSubscription(c: Context, url: String): Int {
+        val normalizedUrl = url.trim()
+        require(normalizedUrl.isNotBlank()) { "أدخل رابط الاشتراك" }
+        val links = withContext(Dispatchers.IO) { SubscriptionParser.fetch(normalizedUrl) }
+            .filter { ConfigParser.parse(it) != null }
+            .distinct()
+        require(links.isNotEmpty()) { "لم يتضمن الاشتراك أي سيرفر مدعوم" }
+        subscriptionLinks[normalizedUrl] = links
+        save(c)
+        return links.size
+    }
+
+    fun removeSubscription(c: Context, url: String) {
+        subscriptionLinks.remove(url)
+        save(c)
+    }
+
+    fun select(c: Context, i: Int) {
+        if (i !in state.value.servers.indices) return
+        state.value = state.value.copy(selected = i)
+        save(c)
+    }
     fun remove(c: Context, i: Int) {
-        state.value = state.value.copy(servers = state.value.servers.filterIndexed { k, _ -> k != i },
-            selected = 0); save(c)
+        val raw = state.value.servers.getOrNull(i)?.raw ?: return
+        manualLinks = manualLinks.filterNot { it == raw }
+        subscriptionLinks.entries.forEach { entry -> entry.setValue(entry.value.filterNot { it == raw }) }
+        subscriptionLinks.entries.removeAll { it.value.isEmpty() }
+        state.value = state.value.copy(selected = 0)
+        save(c)
     }
 
     fun editServer(c: Context, i: Int, name: String, host: String, port: Int, format: String): Boolean {
@@ -102,7 +175,9 @@ object Vpn {
     }
 
     fun clearAll(c: Context) {
-        state.value = state.value.copy(servers = emptyList(), selected = 0, error = null)
+        manualLinks = emptyList()
+        subscriptionLinks.clear()
+        state.value = state.value.copy(servers = emptyList(), selected = 0, error = null, subscriptions = emptyList())
         save(c)
     }
 
@@ -138,6 +213,13 @@ object Vpn {
     }
 
     fun start(c: Context) {
+        reconnectJob?.cancel()
+        reconnectAttempts = 0
+        reconnectEnabled = true
+        startAttempt(c)
+    }
+
+    private fun startAttempt(c: Context) {
         appContext = c.applicationContext
         val s = state.value.current ?: run {
             log("فشل البدء: لا يوجد سيرفر محدد")
@@ -159,6 +241,8 @@ object Vpn {
 
     fun stop(c: Context) {
         appContext = c.applicationContext
+        reconnectEnabled = false
+        reconnectJob?.cancel()
         log("طلب فصل يدوي")
         stopRequested = true
         c.getSharedPreferences("vpn_runtime", Context.MODE_PRIVATE).edit().remove("active_config").apply()
@@ -168,6 +252,8 @@ object Vpn {
     }
 
     fun onConnected() {
+        reconnectAttempts = 0
+        reconnectJob?.cancel()
         log("تم تشغيل النفق بنجاح")
         sessionStartedAt = System.currentTimeMillis()
         sessionServerName = state.value.current?.name ?: "—"
@@ -227,6 +313,19 @@ object Vpn {
         ipJob?.cancel()
         state.value = state.value.copy(connected = false, connecting = false, upKB = 0, downKB = 0,
             pingMs = -1, error = error, publicIp = null, countryName = null, countryCode = null, ipLoading = false)
+        if (!error.isNullOrBlank() && reconnectEnabled && reconnectAttempts < 3) {
+            val attempt = ++reconnectAttempts
+            val waitSeconds = listOf(2L, 5L, 10L)[attempt - 1]
+            val context = appContext ?: return
+            reconnectJob?.cancel()
+            reconnectJob = scope.launch {
+                log("إعادة محاولة الاتصال $attempt/3 بعد ${waitSeconds} ثوانٍ")
+                delay(waitSeconds * 1000)
+                if (reconnectEnabled && !state.value.connected && !state.value.connecting) {
+                    startAttempt(context.applicationContext)
+                }
+            }
+        }
     }
 
     private data class ExitLocation(val ip: String?, val countryName: String?, val countryCode: String?)

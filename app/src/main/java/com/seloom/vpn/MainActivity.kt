@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val Ink = Color(0xFF020207); private val Panel = Color(0xFF16091F)
@@ -453,11 +454,66 @@ fun InfoCard(m: Modifier, icon: ImageVector, title: String, value: String, vc: C
 fun Links(st: UiState) {
     val ctx = LocalContext.current
     val channelLinks = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
     var editingIndex by remember { mutableStateOf<Int?>(null) }
+    var subscriptionUrl by remember { mutableStateOf("") }
+    var subscriptionMessage by remember { mutableStateOf<String?>(null) }
+    var subscriptionBusy by remember { mutableStateOf(false) }
+    fun updateSubscription(url: String) {
+        if (subscriptionBusy) return
+        subscriptionBusy = true
+        subscriptionMessage = null
+        scope.launch {
+            try {
+                val count = Vpn.updateSubscription(ctx, url)
+                subscriptionUrl = ""
+                subscriptionMessage = "تم تحديث الاشتراك وإضافة $count سيرفر"
+            } catch (e: Exception) {
+                subscriptionMessage = e.message ?: "تعذّر تحديث الاشتراك"
+            } finally {
+                subscriptionBusy = false
+            }
+        }
+    }
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Text("إدارة الروابط", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
         Text("VLESS · VMess · Trojan · WireGuard", color = Dim, fontSize = 13.sp)
         Spacer(Modifier.height(14.dp))
+        Column(Modifier.fillMaxWidth().panel().padding(12.dp)) {
+            Text("إضافة اشتراك سيرفرات", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("أدخل رابط HTTPS لجلب السيرفرات وتحديثها لاحقاً.", color = Dim, fontSize = 11.sp)
+            Spacer(Modifier.height(7.dp))
+            OutlinedTextField(value = subscriptionUrl, onValueChange = { subscriptionUrl = it },
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text("رابط الاشتراك") }, placeholder = { Text("https://...") })
+            Spacer(Modifier.height(6.dp))
+            Button(onClick = { updateSubscription(subscriptionUrl) }, enabled = !subscriptionBusy && subscriptionUrl.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = Red), modifier = Modifier.fillMaxWidth()) {
+                if (subscriptionBusy) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                else Icon(Icons.Filled.CloudDownload, null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (subscriptionBusy) "جارٍ جلب السيرفرات…" else "إضافة / تحديث الاشتراك")
+            }
+            subscriptionMessage?.let { Text(it, color = if (it.startsWith("تم")) Green else Red, fontSize = 11.sp) }
+            if (st.subscriptions.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text("الاشتراكات المحفوظة", color = Dim, fontSize = 11.sp)
+                st.subscriptions.forEach { source ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(source, color = TextPrimary, fontSize = 10.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { updateSubscription(source) }, enabled = !subscriptionBusy,
+                            modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Filled.Refresh, "تحديث الاشتراك", tint = Blue, modifier = Modifier.size(19.dp))
+                        }
+                        IconButton(onClick = { Vpn.removeSubscription(ctx, source); subscriptionMessage = "تم حذف الاشتراك" },
+                            enabled = !subscriptionBusy, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Filled.Delete, "حذف الاشتراك", tint = Dim, modifier = Modifier.size(19.dp))
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         Button(onClick = {
             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val txt = cm.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
@@ -476,7 +532,7 @@ fun Links(st: UiState) {
             Text("@freevpsiraq · جميع الخطوط تُحدّث يومياً", color = Blue, fontSize = 11.sp)
         }
         Spacer(Modifier.height(10.dp))
-        if (st.servers.isEmpty()) Text("انسخ رابط سيرفر ثم اضغط «لصق من الحافظة».", color = Dim)
+        if (st.servers.isEmpty()) Text("أضف رابطاً يدوياً أو رابط اشتراك HTTPS، ثم اختر السيرفر للاتصال.", color = Dim)
         LazyColumn(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             itemsIndexed(st.servers) { i, s ->
                 val selected = i == st.selected
