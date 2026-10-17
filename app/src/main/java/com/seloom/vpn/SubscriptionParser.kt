@@ -1,5 +1,8 @@
 package com.seloom.vpn
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.util.Base64
 import java.net.HttpURLConnection
 import java.net.URI
@@ -10,7 +13,7 @@ object SubscriptionParser {
     private const val MAX_SUBSCRIPTION_BYTES = 2 * 1024 * 1024
     private val linkPattern = Regex("(?i)(?:vless|vmess|trojan|wireguard)://[^\\s<>\\\"']+")
 
-    fun fetch(urlText: String): List<String> {
+    fun fetch(context: Context, urlText: String): List<String> {
         val url = urlText.trim()
         val uri = URI(url)
         require(uri.scheme?.equals("https", ignoreCase = true) == true && !uri.host.isNullOrBlank()) {
@@ -18,7 +21,7 @@ object SubscriptionParser {
         }
         require(uri.userInfo == null) { "لا تضع بيانات دخول داخل رابط الاشتراك" }
 
-        val connection = (URL(url).openConnection() as HttpURLConnection)
+        val connection = (openConnectionOutsideVpn(context, URL(url)) as HttpURLConnection)
         return try {
             connection.requestMethod = "GET"
             connection.connectTimeout = 15_000
@@ -51,6 +54,21 @@ object SubscriptionParser {
         } finally {
             connection.disconnect()
         }
+    }
+
+    /** Bind subscription traffic to the physical internet network, not the VPN TUN. */
+    private fun openConnectionOutsideVpn(context: Context, url: URL): java.net.URLConnection {
+        val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return url.openConnection()
+        val physicalNetwork = runCatching {
+            manager.allNetworks.firstOrNull { network ->
+                val capabilities = manager.getNetworkCapabilities(network)
+                capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            }
+        }.getOrNull()
+        return runCatching { physicalNetwork?.openConnection(url) ?: url.openConnection() }
+            .getOrElse { url.openConnection() }
     }
 
     /** Extracts multiple links even when they share a Markdown line or are Base64 encoded. */

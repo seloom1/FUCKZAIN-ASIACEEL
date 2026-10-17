@@ -152,7 +152,7 @@ object Vpn {
         val selectedRaw = state.value.current?.raw
         val wasSelectedFromThisSubscription = selectedRaw != null &&
             subscriptionLinks[normalizedUrl].orEmpty().contains(selectedRaw)
-        val links = withContext(Dispatchers.IO) { SubscriptionParser.fetch(normalizedUrl) }
+        val links = withContext(Dispatchers.IO) { SubscriptionParser.fetch(c.applicationContext, normalizedUrl) }
             .filter { ConfigParser.parse(it) != null }
             .distinct()
         require(links.isNotEmpty()) { "لم يتضمن الاشتراك أي سيرفر مدعوم" }
