@@ -24,8 +24,10 @@ data class UiState(
     val countryCode: String? = null, val ipLoading: Boolean = false,
     val localDnsEnabled: Boolean = false,
     val subscriptions: List<String> = emptyList(),
+    val subscriptionNames: Map<String, String> = emptyMap(),
     val manualServers: List<Server> = emptyList(),
     val subscriptionServers: Map<String, List<Server>> = emptyMap(),
+    val upBps: Long = 0, val downBps: Long = 0,
     val bypassLanRouteEnabled: Boolean = false
 ) { val current get() = servers.getOrNull(selected) }
 
@@ -40,6 +42,7 @@ object Vpn {
     private var appContext: Context? = null
     private var manualLinks: List<String> = emptyList()
     private var subscriptionLinks: LinkedHashMap<String, List<String>> = linkedMapOf()
+    private var subscriptionNames: LinkedHashMap<String, String> = linkedMapOf()
     private var reconnectJob: Job? = null
     private var reconnectAttempts = 0
     @Volatile private var reconnectEnabled = false
@@ -62,6 +65,8 @@ object Vpn {
             true
         } else preferences.getBoolean("local_dns_enabled", true)
         subscriptionLinks = decodeSubscriptions(preferences.getString("server_subscriptions", null))
+        subscriptionNames = decodeSubscriptionNames(preferences.getString("server_subscription_names", null))
+        subscriptionNames.keys.retainAll(subscriptionLinks.keys)
         val subscribedRaw = subscriptionLinks.values.flatten().toSet()
         manualLinks = if (preferences.contains("manual_links")) {
             preferences.getString("manual_links", "").orEmpty().split("\u0001").filter { it.isNotBlank() }
@@ -73,6 +78,7 @@ object Vpn {
         state.value = state.value.copy(servers = servers,
             selected = preferences.getInt("sel", 0).coerceIn(0, (servers.size - 1).coerceAtLeast(0)),
             subscriptions = subscriptionLinks.keys.toList(),
+            subscriptionNames = LinkedHashMap(subscriptionNames),
             manualServers = manualLinks.mapNotNull(ConfigParser::parse),
             subscriptionServers = subscriptionLinks.mapValues { (_, links) -> links.mapNotNull(ConfigParser::parse) },
             excludedApps = prefs(c).getStringSet("excluded_apps", emptySet()).orEmpty().toSet(),
@@ -98,6 +104,17 @@ object Vpn {
         }
     }.getOrDefault(linkedMapOf())
 
+    private fun encodeSubscriptionNames(): String = JSONObject().apply {
+        subscriptionNames.forEach { (url, name) -> put(url, name) }
+    }.toString()
+
+    private fun decodeSubscriptionNames(raw: String?): LinkedHashMap<String, String> = runCatching {
+        val json = JSONObject(raw ?: "{}")
+        LinkedHashMap<String, String>().apply {
+            json.keys().forEach { url -> json.optString(url).trim().takeIf(String::isNotBlank)?.let { put(url, it) } }
+        }
+    }.getOrDefault(linkedMapOf())
+
     private fun save(c: Context) {
         val raws = (manualLinks + subscriptionLinks.values.flatten()).distinct()
         val servers = raws.mapNotNull(ConfigParser::parse)
@@ -106,12 +123,14 @@ object Vpn {
             ?.takeIf { it >= 0 } ?: state.value.selected.coerceIn(0, (servers.size - 1).coerceAtLeast(0))
         state.value = state.value.copy(servers = servers, selected = selected,
             subscriptions = subscriptionLinks.keys.toList(),
+            subscriptionNames = LinkedHashMap(subscriptionNames),
             manualServers = manualLinks.mapNotNull(ConfigParser::parse),
             subscriptionServers = subscriptionLinks.mapValues { (_, links) -> links.mapNotNull(ConfigParser::parse) })
         prefs(c).edit()
             .putString("links", raws.joinToString("\u0001"))
             .putString("manual_links", manualLinks.joinToString("\u0001"))
             .putString("server_subscriptions", encodeSubscriptions())
+            .putString("server_subscription_names", encodeSubscriptionNames())
             .putInt("sel", selected)
             .apply()
     }
@@ -127,20 +146,35 @@ object Vpn {
         return newLinks.size
     }
 
-    suspend fun updateSubscription(c: Context, url: String): Int {
+    suspend fun updateSubscription(c: Context, url: String, name: String? = null): Int {
         val normalizedUrl = url.trim()
         require(normalizedUrl.isNotBlank()) { "أدخل رابط الاشتراك" }
+        val selectedRaw = state.value.current?.raw
+        val wasSelectedFromThisSubscription = selectedRaw != null &&
+            subscriptionLinks[normalizedUrl].orEmpty().contains(selectedRaw)
         val links = withContext(Dispatchers.IO) { SubscriptionParser.fetch(normalizedUrl) }
             .filter { ConfigParser.parse(it) != null }
             .distinct()
         require(links.isNotEmpty()) { "لم يتضمن الاشتراك أي سيرفر مدعوم" }
-        subscriptionLinks[normalizedUrl] = links
+        // Keep a live selected node if the provider removes it during refresh.
+        val refreshedLinks = if (state.value.connected && wasSelectedFromThisSubscription &&
+            selectedRaw !in links) links + selectedRaw!! else links
+        subscriptionLinks[normalizedUrl] = refreshedLinks
+        name?.trim()?.takeIf(String::isNotBlank)?.let { subscriptionNames[normalizedUrl] = it }
+        if (subscriptionNames[normalizedUrl].isNullOrBlank())
+            subscriptionNames[normalizedUrl] = normalizedUrl.substringAfterLast('/').ifBlank { "اشتراك سيرفرات" }
         save(c)
         return links.size
     }
 
+    fun renameSubscription(c: Context, url: String, name: String) {
+        name.trim().takeIf(String::isNotBlank)?.let { subscriptionNames[url] = it }
+        save(c)
+    }
+
     fun removeSubscription(c: Context, url: String) {
         subscriptionLinks.remove(url)
+        subscriptionNames.remove(url)
         save(c)
     }
 
@@ -196,7 +230,9 @@ object Vpn {
     fun clearAll(c: Context) {
         manualLinks = emptyList()
         subscriptionLinks.clear()
-        state.value = state.value.copy(servers = emptyList(), selected = 0, error = null, subscriptions = emptyList())
+        subscriptionNames.clear()
+        state.value = state.value.copy(servers = emptyList(), selected = 0, error = null,
+            subscriptions = emptyList(), subscriptionNames = emptyMap())
         save(c)
     }
 
@@ -252,7 +288,7 @@ object Vpn {
         stopRequested = false
         state.value = state.value.copy(connected = false, connecting = true, error = null,
             publicIp = null, countryName = null, countryCode = null, ipLoading = true,
-            totalUpKB = 0, totalDownKB = 0)
+            totalUpKB = 0, totalDownKB = 0, upBps = 0, downBps = 0)
         val intent = Intent(c, SingBoxService::class.java).putExtra("config", config)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) c.startForegroundService(intent)
         else c.startService(intent)
@@ -282,6 +318,9 @@ object Vpn {
         statsJob?.cancel()
         statsJob = scope.launch {
             val uid = Process.myUid(); var tx = TrafficStats.getUidTxBytes(uid); var rx = TrafficStats.getUidRxBytes(uid)
+            if (tx < 0) tx = TrafficStats.getTotalTxBytes()
+            if (rx < 0) rx = TrafficStats.getTotalRxBytes()
+            var sampledAt = android.os.SystemClock.elapsedRealtime()
             var totalTx = 0L; var totalRx = 0L
             launch {
                 while (isActive) {
@@ -290,13 +329,20 @@ object Vpn {
                 }
             }
             while (isActive) {
-                delay(1000)
-                val ntx = TrafficStats.getUidTxBytes(uid); val nrx = TrafficStats.getUidRxBytes(uid)
+                delay(500)
+                var ntx = TrafficStats.getUidTxBytes(uid); var nrx = TrafficStats.getUidRxBytes(uid)
+                if (ntx < 0) ntx = TrafficStats.getTotalTxBytes()
+                if (nrx < 0) nrx = TrafficStats.getTotalRxBytes()
                 val deltaTx = (ntx - tx).coerceAtLeast(0); val deltaRx = (nrx - rx).coerceAtLeast(0)
+                val now = android.os.SystemClock.elapsedRealtime()
+                val elapsedMs = (now - sampledAt).coerceAtLeast(1)
+                val uploadRate = deltaTx * 1000 / elapsedMs
+                val downloadRate = deltaRx * 1000 / elapsedMs
                 totalTx += deltaTx; totalRx += deltaRx
-                state.value = state.value.copy(upKB = deltaTx / 1024, downKB = deltaRx / 1024,
+                state.value = state.value.copy(upKB = uploadRate / 1024, downKB = downloadRate / 1024,
+                    upBps = uploadRate, downBps = downloadRate,
                     totalUpKB = totalTx / 1024, totalDownKB = totalRx / 1024)
-                tx = ntx; rx = nrx
+                tx = ntx; rx = nrx; sampledAt = now
             }
         }
         ipJob?.cancel()
@@ -331,6 +377,7 @@ object Vpn {
         statsJob?.cancel()
         ipJob?.cancel()
         state.value = state.value.copy(connected = false, connecting = false, upKB = 0, downKB = 0,
+            upBps = 0, downBps = 0,
             pingMs = -1, error = error, publicIp = null, countryName = null, countryCode = null, ipLoading = false)
         if (!error.isNullOrBlank() && reconnectEnabled && reconnectAttempts < 3) {
             val attempt = ++reconnectAttempts

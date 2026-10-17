@@ -158,52 +158,56 @@ fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: 
                 modifier = Modifier.size(28.dp).clickable(onClick = onSettings))
         }
         Hero()
-        Text("FUCK ASIACEEL & ZAIN", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Black,
+        Spacer(Modifier.height(5.dp))
+        Text("FUCK ASIACEEL & ZAIN", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Black,
             letterSpacing = 0.7.sp, modifier = Modifier.align(Alignment.CenterHorizontally), maxLines = 1)
-        Spacer(Modifier.height(7.dp))
+        Spacer(Modifier.height(8.dp))
         ExitIpCard(st)
         Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Column(Modifier.weight(1.12f).panel().padding(horizontal = 8.dp, vertical = 7.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("سرعة الاتصال", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        Row(Modifier.fillMaxWidth().panel().padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Flag(st.countryCode)
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f)) {
+                Text("السيرفر الحالي", color = Dim, fontSize = 10.sp)
+                Text(st.current?.name ?: "اختر سيرفراً من القائمة", color = TextPrimary,
+                    fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            Box(Modifier.width(1.dp).height(32.dp).background(DeepRed))
+            Spacer(Modifier.width(10.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Filled.CellTower, null, tint = Red, modifier = Modifier.size(18.dp))
+                Text("${st.pingMs.takeIf { it >= 0 }?.let { "$it ms" } ?: "—"}",
+                    color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(Modifier.fillMaxWidth().padding(vertical = 2.dp), contentAlignment = Alignment.Center) {
+            PowerButton(st, onToggle)
+        }
+        Text(if (st.connected) "الاتصال آمن ونشط" else if (st.connecting) "جارٍ إنشاء الاتصال…" else "اضغط للاتصال",
+            color = if (st.connected) Green else Dim, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.CenterHorizontally))
+        Spacer(Modifier.height(9.dp))
+        Column(Modifier.fillMaxWidth().panel().padding(horizontal = 12.dp, vertical = 9.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("حركة الإنترنت المباشرة", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(7.dp).background(if (st.connected) Green else Dim, CircleShape))
-                }
-                HeartbeatWave(st.connected)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    SpeedStat(Icons.Filled.ArrowUpward, Green, st.upKB, "رفع")
-                    SpeedStat(Icons.Filled.ArrowDownward, Blue, st.downKB, "تنزيل")
+                    Spacer(Modifier.width(5.dp))
+                    Text(if (st.connected) "مباشر" else "غير متصل", color = Dim, fontSize = 9.sp)
                 }
             }
-            PowerButton(st, onToggle)
-            Column(Modifier.weight(0.88f).panel().padding(horizontal = 8.dp, vertical = 7.dp),
-                horizontalAlignment = Alignment.End) {
-                val name = st.current?.name ?: "—"
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("السيرفر المحدد", color = Dim, fontSize = 9.sp)
-                        Text(name, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 10.sp,
-                            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    }
-                    Spacer(Modifier.width(5.dp)); Flag(st.countryCode)
-                }
-                Box(Modifier.padding(vertical = 6.dp).fillMaxWidth().height(1.dp).background(DeepRed))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("التأخير", color = Dim, fontSize = 9.sp)
-                        Text(if (st.pingMs >= 0) "${st.pingMs} ms" else "— ms", color = TextPrimary, fontSize = 11.sp)
-                    }
-                    Spacer(Modifier.width(5.dp))
-                    Box(Modifier.size(25.dp).background(DeepRed.copy(0.7f), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.CellTower, null, tint = Red, modifier = Modifier.size(15.dp))
-                    }
-                }
+            HeartbeatWave(st.connected, st.upBps, st.downBps)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SpeedStat(Modifier.weight(1f), Icons.Filled.ArrowUpward, Green, st.upBps, "سرعة الرفع")
+                SpeedStat(Modifier.weight(1f), Icons.Filled.ArrowDownward, Blue, st.downBps, "سرعة التنزيل")
             }
         }
         st.error?.let { Text(it, color = Red, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp).align(Alignment.CenterHorizontally)) }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(9.dp))
         Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             Row(Modifier.fillMaxWidth().panel().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 InfoCard(Modifier.weight(1f), Icons.Filled.Shield, "حماية الإنترنت",
@@ -392,27 +396,29 @@ fun PowerButton(st: UiState, onClick: () -> Unit) {
         infiniteRepeatable(tween(1400), RepeatMode.Reverse), label = "a")
     val on = st.connected
     val powerColor = if (on) Green else Red
-    Box(Modifier.padding(horizontal = 1.dp).size(88.dp).drawBehind {
+    Box(Modifier.padding(horizontal = 1.dp).size(142.dp).drawBehind {
         drawCircle(Brush.radialGradient(listOf(powerColor.copy(if (on) 0.5f * glow else 0.18f), Color.Transparent)), size.minDimension * 0.62f)
     }.clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(82.dp).border(2.dp, Color(0xFF2A2326), CircleShape).padding(4.dp)
-            .border(2.dp, powerColor, CircleShape).background(Color(0xFF090611), CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(132.dp).border(3.dp, Color(0xFF2A2326), CircleShape).padding(6.dp)
+            .border(3.dp, powerColor, CircleShape).background(Color(0xFF090611), CircleShape), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (st.connecting) CircularProgressIndicator(color = powerColor, modifier = Modifier.size(26.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Filled.PowerSettingsNew, null, tint = powerColor, modifier = Modifier.size(29.dp))
+                if (st.connecting) CircularProgressIndicator(color = powerColor, modifier = Modifier.size(42.dp), strokeWidth = 3.dp)
+                else Icon(Icons.Filled.PowerSettingsNew, null, tint = powerColor, modifier = Modifier.size(48.dp))
                 Text(if (on) "متصل" else if (st.connecting) "جارٍ الاتصال" else "متوقف", color = powerColor,
-                    fontWeight = FontWeight.Bold, fontSize = 10.sp, maxLines = 1)
+                    fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
             }
         }
     }
 }
 
 @Composable
-private fun HeartbeatWave(active: Boolean) {
+private fun HeartbeatWave(connected: Boolean, uploadBps: Long, downloadBps: Long) {
+    val activity = (maxOf(uploadBps, downloadBps).coerceAtLeast(0L) / 160_000f).coerceIn(0f, 1f)
+    val period = (1850 - (activity * 1150).toInt()).coerceIn(650, 1850)
     val transition = rememberInfiniteTransition(label = "heartbeat")
     val phase by transition.animateFloat(0f, 1f,
-        infiniteRepeatable(tween(1700, easing = LinearEasing), RepeatMode.Restart), label = "phase")
-    Canvas(Modifier.fillMaxWidth().height(34.dp)) {
+        infiniteRepeatable(tween(period, easing = LinearEasing), RepeatMode.Restart), label = "phase")
+    Canvas(Modifier.fillMaxWidth().height(46.dp)) {
         val mid = size.height / 2f
         drawLine(DeepRed.copy(alpha = 0.7f), Offset(0f, mid), Offset(size.width, mid), strokeWidth = 1f)
         val beat = floatArrayOf(0f, 0f, 0.05f, -0.08f, 0.10f, 0f, 0f, 0.70f, -0.92f, 0.22f, 0f, 0.04f, 0f)
@@ -425,7 +431,8 @@ private fun HeartbeatWave(active: Boolean) {
                 val sample = position.toInt().coerceIn(0, beat.lastIndex - 1)
                 val fraction = position - sample
                 val wave = beat[sample] + (beat[sample + 1] - beat[sample]) * fraction
-                val y = mid - wave * size.height * if (active) 0.36f else 0.025f
+                val intensity = if (connected) 0.05f + activity * 0.45f else 0.015f
+                val y = mid - wave * size.height * intensity
                 if (i == 0) path.moveTo(0f, y) else path.lineTo(size.width * xRatio, y)
             }
             drawPath(path, color.copy(alpha = 0.18f), style = Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round))
@@ -437,15 +444,23 @@ private fun HeartbeatWave(active: Boolean) {
 }
 
 @Composable
-private fun SpeedStat(icon: ImageVector, color: Color, kb: Long, label: String) {
-    val display = if (kb >= 1000) "%.1f".format(kb / 1000f) else kb.toString()
-    val unit = if (kb >= 1000) "MB/s" else "KB/s"
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(12.dp))
-        Spacer(Modifier.width(2.dp))
+private fun SpeedStat(modifier: Modifier, icon: ImageVector, color: Color, bytesPerSecond: Long, label: String) {
+    val (display, unit) = when {
+        bytesPerSecond >= 1_048_576 -> "%.2f".format(bytesPerSecond / 1_048_576f) to "MB/s"
+        bytesPerSecond >= 1024 -> "%.1f".format(bytesPerSecond / 1024f) to "KB/s"
+        else -> bytesPerSecond.coerceAtLeast(0).toString() to "B/s"
+    }
+    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.07f))
+        .padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(7.dp))
         Column {
-            Text("$display $unit", color = color, fontWeight = FontWeight.Bold, fontSize = 9.sp, maxLines = 1)
-            Text(label, color = Dim, fontSize = 8.sp)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(display, color = color, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
+                Spacer(Modifier.width(3.dp))
+                Text(unit, color = TextPrimary, fontSize = 9.sp, modifier = Modifier.padding(bottom = 2.dp))
+            }
+            Text(label, color = Dim, fontSize = 9.sp)
         }
     }
 }
@@ -495,6 +510,10 @@ fun Links(st: UiState) {
     val scope = rememberCoroutineScope()
     var showAddDialog by remember { mutableStateOf(false) }
     var editingIndex by remember { mutableStateOf<Int?>(null) }
+    var editingSubscription by remember { mutableStateOf<String?>(null) }
+    var editedSubscriptionName by remember { mutableStateOf("") }
+    var newSubscriptionName by remember { mutableStateOf("") }
+    var newSubscriptionUrl by remember { mutableStateOf("") }
     var expandedSources by remember { mutableStateOf(emptySet<String>()) }
     var loadingUrl by remember { mutableStateOf<String?>(null) }
 
@@ -503,7 +522,7 @@ fun Links(st: UiState) {
         return manager.primaryClip?.getItemAt(0)?.text?.toString()?.trim().orEmpty()
     }
 
-    fun updateSubscription(url: String) {
+    fun updateSubscription(url: String, name: String? = null) {
         if (loadingUrl != null) return
         if (url.isBlank()) {
             Toast.makeText(ctx, "انسخ رابط الاشتراك أولاً", Toast.LENGTH_SHORT).show()
@@ -512,8 +531,10 @@ fun Links(st: UiState) {
         loadingUrl = url
         scope.launch {
             try {
-                val count = Vpn.updateSubscription(ctx, url)
+                val count = Vpn.updateSubscription(ctx, url, name)
                 expandedSources = expandedSources + url
+                newSubscriptionName = ""
+                newSubscriptionUrl = ""
                 Toast.makeText(ctx, "تم تحديث الاشتراك: $count سيرفر", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(ctx, e.message ?: "تعذّر تحديث الاشتراك", Toast.LENGTH_LONG).show()
@@ -555,11 +576,16 @@ fun Links(st: UiState) {
             }
             items(st.subscriptions, key = { "subscription:$it" }) { source ->
                 val expanded = source in expandedSources
-                SubscriptionCard(source = source, servers = st.subscriptionServers[source].orEmpty(),
+                SubscriptionCard(source = source, displayName = st.subscriptionNames[source] ?: "اشتراك سيرفرات",
+                    servers = st.subscriptionServers[source].orEmpty(),
                     expanded = expanded, loading = loadingUrl == source,
                     selectedRaw = st.current?.raw,
                     onToggle = { expandedSources = if (expanded) expandedSources - source else expandedSources + source },
                     onRefresh = { updateSubscription(source) },
+                    onRename = {
+                        editingSubscription = source
+                        editedSubscriptionName = st.subscriptionNames[source] ?: "اشتراك سيرفرات"
+                    },
                     onRemove = {
                         Vpn.removeSubscription(ctx, source)
                         expandedSources = expandedSources - source
@@ -586,31 +612,58 @@ fun Links(st: UiState) {
     }
     if (showAddDialog) {
         AlertDialog(onDismissRequest = { showAddDialog = false },
-            title = { Text("إضافة من الحافظة", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            title = { Text("اشتراك جديد", color = TextPrimary, fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Text("انسخ الرابط أولاً، ثم اختر نوع الإضافة.", color = Dim, fontSize = 12.sp)
-                    Button(onClick = {
-                        val url = clipboardText()
-                        showAddDialog = false
-                        if (!url.startsWith("https://", ignoreCase = true))
-                            Toast.makeText(ctx, "انسخ رابط اشتراك HTTPS أولاً", Toast.LENGTH_SHORT).show()
-                        else updateSubscription(url)
-                    }, enabled = loadingUrl == null, modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Red)) {
-                        Icon(Icons.Filled.Link, null); Spacer(Modifier.width(7.dp)); Text("إضافة اشتراك من الحافظة")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("أضف اسماً يسهل تمييزه ورابط الاشتراك.", color = Dim, fontSize = 12.sp)
+                    OutlinedTextField(value = newSubscriptionName, onValueChange = { newSubscriptionName = it },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("اسم الاشتراك") },
+                        placeholder = { Text("مثال: سيرفرات البيت") })
+                    OutlinedTextField(value = newSubscriptionUrl, onValueChange = { newSubscriptionUrl = it },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("رابط HTTPS") },
+                        placeholder = { Text("https://...") })
+                    TextButton(onClick = { newSubscriptionUrl = clipboardText() }, modifier = Modifier.align(Alignment.End)) {
+                        Icon(Icons.Filled.ContentPaste, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(4.dp)); Text("لصق الرابط")
                     }
                     OutlinedButton(onClick = {
                         val count = Vpn.import(ctx, clipboardText())
                         showAddDialog = false
                         Toast.makeText(ctx, if (count > 0) "تمت إضافة $count سيرفر" else "لا يوجد رابط VLESS صالح في الحافظة",
                             Toast.LENGTH_SHORT).show()
-                    }, modifier = Modifier.fillMaxWidth()) {
+                    }, modifier = Modifier.fillMaxWidth(), enabled = loadingUrl == null) {
                         Icon(Icons.Filled.Link, null); Spacer(Modifier.width(7.dp)); Text("إضافة سيرفر VLESS من الحافظة")
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showAddDialog = false }) { Text("إغلاق") } })
+            confirmButton = {
+                Button(onClick = {
+                    val url = newSubscriptionUrl.trim()
+                    if (!url.startsWith("https://", ignoreCase = true)) {
+                        Toast.makeText(ctx, "أدخل رابط اشتراك يبدأ بـ https://", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showAddDialog = false
+                        updateSubscription(url, newSubscriptionName)
+                    }
+                }, enabled = loadingUrl == null && newSubscriptionUrl.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Red)) { Text("إضافة اشتراك") }
+            },
+            dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text("إلغاء") } })
+    }
+    editingSubscription?.let { url ->
+        AlertDialog(onDismissRequest = { editingSubscription = null },
+            title = { Text("تسمية الاشتراك", color = TextPrimary, fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(value = editedSubscriptionName, onValueChange = { editedSubscriptionName = it },
+                    singleLine = true, label = { Text("اسم الاشتراك") }, modifier = Modifier.fillMaxWidth())
+            },
+            confirmButton = {
+                Button(onClick = {
+                    Vpn.renameSubscription(ctx, url, editedSubscriptionName)
+                    editingSubscription = null
+                }, colors = ButtonDefaults.buttonColors(containerColor = Red)) { Text("حفظ الاسم") }
+            },
+            dismissButton = { TextButton(onClick = { editingSubscription = null }) { Text("إلغاء") } })
     }
     editingIndex?.let { index ->
         st.servers.getOrNull(index)?.let { server ->
@@ -622,23 +675,35 @@ fun Links(st: UiState) {
 @Composable
 private fun SubscriptionCard(
     source: String,
+    displayName: String,
     servers: List<Server>,
     expanded: Boolean,
     loading: Boolean,
     selectedRaw: String?,
     onToggle: () -> Unit,
     onRefresh: () -> Unit,
+    onRename: () -> Unit,
     onRemove: () -> Unit,
     onSelect: (Server) -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().panel().padding(10.dp)) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+        .background(Brush.horizontalGradient(listOf(Panel, Color(0xFF21102D), Panel)))
+        .border(1.dp, Brush.horizontalGradient(listOf(DeepRed, Red.copy(alpha = 0.45f), DeepRed)), RoundedCornerShape(18.dp))
+        .padding(11.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).clickable(onClick = onToggle)) {
-                Text("اشتراك سيرفرات", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(displayName, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 Text(source, color = Dim, fontSize = 10.sp, maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
-            Text("${servers.size}", color = Green, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Box(Modifier.clip(CircleShape).background(Green.copy(alpha = 0.12f)).padding(horizontal = 9.dp, vertical = 5.dp)) {
+                Text("${servers.size} سيرفر", color = Green, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+            IconButton(onClick = onRefresh, enabled = !loading, modifier = Modifier.size(37.dp)) {
+                if (loading) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp)
+                else Icon(Icons.Filled.Refresh, "تحديث الاشتراك", tint = Blue, modifier = Modifier.size(20.dp))
+            }
             IconButton(onClick = onToggle, modifier = Modifier.size(34.dp)) {
                 Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                     if (expanded) "طي الاشتراك" else "عرض السيرفرات", tint = Red)
@@ -651,6 +716,9 @@ private fun SubscriptionCard(
                     if (loading) CircularProgressIndicator(Modifier.size(16.dp), color = Green, strokeWidth = 2.dp)
                     else Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(5.dp)); Text(if (loading) "جارٍ التحديث" else "تحديث الاشتراك", fontSize = 11.sp)
+                }
+                OutlinedButton(onClick = onRename, enabled = !loading) {
+                    Icon(Icons.Filled.Edit, null, modifier = Modifier.size(16.dp)); Text("تسمية", fontSize = 11.sp)
                 }
                 OutlinedButton(onClick = onRemove, enabled = !loading) {
                     Icon(Icons.Filled.Delete, null, modifier = Modifier.size(16.dp)); Text("حذف", fontSize = 11.sp)
