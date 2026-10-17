@@ -150,61 +150,75 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScene() {
 @Composable
 fun Home(st: UiState, onToggle: () -> Unit, onSettings: () -> Unit, onProtocol: () -> Unit) {
     var showDeveloper by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Icon(Icons.Filled.Menu, "معلومات المطور", tint = Color.White,
-                modifier = Modifier.size(25.dp).clickable { showDeveloper = true })
-            Text("FUCK ASIACEEL & ZAIN", color = TextPrimary, fontSize = 15.sp,
-                fontWeight = FontWeight.Black, letterSpacing = 0.4.sp, maxLines = 1)
+                modifier = Modifier.size(28.dp).clickable { showDeveloper = true })
             Icon(Icons.Filled.Settings, null, tint = Color.White,
-                modifier = Modifier.size(25.dp).clickable(onClick = onSettings))
+                modifier = Modifier.size(28.dp).clickable(onClick = onSettings))
         }
-        Spacer(Modifier.height(2.dp))
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { PowerButton(st, onToggle) }
-        Text(if (st.connected) "متصل" else if (st.connecting) "جارٍ الاتصال…" else "اضغط للاتصال",
-            color = if (st.connected) Green else Dim, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+        Hero()
+        Spacer(Modifier.height(5.dp))
+        Text("FUCK ASIACEEL & ZAIN", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Black,
+            letterSpacing = 0.7.sp, modifier = Modifier.align(Alignment.CenterHorizontally), maxLines = 1)
+        Spacer(Modifier.height(8.dp))
+        ExitIpCard(st)
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth().panel().padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Flag(st.countryCode)
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f)) {
+                Text("السيرفر الحالي", color = Dim, fontSize = 10.sp)
+                Text(st.current?.name ?: "اختر سيرفراً من القائمة", color = TextPrimary,
+                    fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            Box(Modifier.width(1.dp).height(32.dp).background(DeepRed))
+            Spacer(Modifier.width(10.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Filled.CellTower, null, tint = Red, modifier = Modifier.size(18.dp))
+                Text("${st.pingMs.takeIf { it >= 0 }?.let { "$it ms" } ?: "—"}",
+                    color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(Modifier.fillMaxWidth().padding(vertical = 2.dp), contentAlignment = Alignment.Center) {
+            PowerButton(st, onToggle)
+        }
+        Text(if (st.connected) "الاتصال آمن ونشط" else if (st.connecting) "جارٍ إنشاء الاتصال…" else "اضغط للاتصال",
+            color = if (st.connected) Green else Dim, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.align(Alignment.CenterHorizontally))
-        Spacer(Modifier.height(6.dp))
-        Column(Modifier.fillMaxWidth().panel().padding(horizontal = 10.dp, vertical = 7.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Dns, null, tint = Red, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(7.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("السيرفر الحالي", color = Dim, fontSize = 9.sp)
-                    Text(st.current?.name ?: "اختر سيرفراً", color = TextPrimary, fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Spacer(Modifier.height(9.dp))
+        Column(Modifier.fillMaxWidth().panel().padding(horizontal = 12.dp, vertical = 9.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("حركة الإنترنت المباشرة", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(7.dp).background(if (st.connected) Green else Dim, CircleShape))
+                    Spacer(Modifier.width(5.dp))
+                    Text(if (st.connected) "مباشر" else "غير متصل", color = Dim, fontSize = 9.sp)
                 }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("التأخير", color = Dim, fontSize = 8.sp)
-                    Text(st.pingMs.takeIf { it >= 0 }?.let { "$it ms" } ?: "—", color = TextPrimary,
-                        fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            HorizontalDivider(color = DeepRed.copy(alpha = 0.55f), modifier = Modifier.padding(vertical = 5.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CompactInfoChip(Modifier.weight(1f), Icons.AutoMirrored.Filled.Send, "البروتوكول",
-                    st.current?.protocol ?: "—", Color.White, onProtocol)
-                CompactInfoChip(Modifier.weight(1f), Icons.Filled.Shield, "حماية الإنترنت",
-                    if (st.connected) "نشطة" else "متوقفة", if (st.connected) Green else Dim) {}
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Column(Modifier.fillMaxWidth().panel().padding(horizontal = 9.dp, vertical = 7.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CompactMetric(Modifier.weight(1f), "IP عبر VPN", st.publicIp ?: if (st.ipLoading) "جارٍ الفحص…" else "—")
-                CompactMetric(Modifier.weight(1f), "الدولة", st.countryName ?: "—", countryFlagEmoji(st.countryCode))
             }
             HeartbeatWave(st.connected, st.upBps, st.downBps)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                SpeedStat(Modifier.weight(1f), Icons.Filled.ArrowUpward, Green, st.upBps, "رفع")
-                SpeedStat(Modifier.weight(1f), Icons.Filled.ArrowDownward, Blue, st.downBps, "تنزيل")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SpeedStat(Modifier.weight(1f), Icons.Filled.ArrowUpward, Green, st.upBps, "سرعة الرفع")
+                SpeedStat(Modifier.weight(1f), Icons.Filled.ArrowDownward, Blue, st.downBps, "سرعة التنزيل")
             }
         }
         st.error?.let { Text(it, color = Red, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp).align(Alignment.CenterHorizontally)) }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(9.dp))
+        Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+            Row(Modifier.fillMaxWidth().panel().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                InfoCard(Modifier.weight(1f), Icons.Filled.Shield, "حماية الإنترنت",
+                    if (st.connected) "نشط" else "متوقف", if (st.connected) Green else Dim) {}
+                InfoCard(Modifier.weight(1f), Icons.AutoMirrored.Filled.Send, "البروتوكول",
+                    st.current?.protocol ?: "—", Color.White, onProtocol)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
         AppExclusionSection(st)
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(8.dp))
     }
     if (showDeveloper) {
         AlertDialog(
@@ -261,28 +275,21 @@ private fun AppExclusionSection(st: UiState) {
     Column(Modifier.fillMaxWidth().panel().padding(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(30.dp).clip(CircleShape).background(Blue.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Apps, null, tint = Blue, modifier = Modifier.size(17.dp))
-                }
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text("استثناء التطبيقات", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    Text("اتصال مباشر للهاتف", color = Dim, fontSize = 8.sp)
-                }
+            Column(Modifier.weight(1f)) {
+                Text("استثناء التطبيقات", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("تستخدم اتصال الهاتف المباشر", color = Dim, fontSize = 10.sp)
             }
-            Box(Modifier.clip(CircleShape).background(Green.copy(alpha = 0.12f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                Text("${st.excludedApps.size}", color = Green, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-            }
-            TextButton(onClick = {
-                selectedApps = st.excludedApps
-                appSearch = ""
-                showPicker = !showPicker
-            }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp)) {
-                Text(if (showPicker) "إخفاء" else "إدارة", fontSize = 10.sp)
-                Icon(if (showPicker) Icons.Filled.ExpandLess else Icons.Filled.ChevronRight,
-                    null, modifier = Modifier.size(15.dp))
-            }
+            Text("${st.excludedApps.size}", color = Green, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(5.dp))
+        OutlinedButton(onClick = {
+            selectedApps = st.excludedApps
+            appSearch = ""
+            showPicker = !showPicker
+        }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Apps, null)
+            Spacer(Modifier.width(8.dp))
+            Text(if (showPicker) "إخفاء التطبيقات" else "اختيار التطبيقات", fontSize = 12.sp)
         }
         if (showPicker) {
             Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -389,16 +396,16 @@ fun PowerButton(st: UiState, onClick: () -> Unit) {
         infiniteRepeatable(tween(1400), RepeatMode.Reverse), label = "a")
     val on = st.connected
     val powerColor = if (on) Green else Red
-    Box(Modifier.padding(horizontal = 1.dp).size(104.dp).drawBehind {
+    Box(Modifier.padding(horizontal = 1.dp).size(142.dp).drawBehind {
         drawCircle(Brush.radialGradient(listOf(powerColor.copy(if (on) 0.5f * glow else 0.18f), Color.Transparent)), size.minDimension * 0.62f)
     }.clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(96.dp).border(2.dp, Color(0xFF2A2326), CircleShape).padding(4.dp)
-            .border(2.dp, powerColor, CircleShape).background(Color(0xFF090611), CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(132.dp).border(3.dp, Color(0xFF2A2326), CircleShape).padding(6.dp)
+            .border(3.dp, powerColor, CircleShape).background(Color(0xFF090611), CircleShape), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (st.connecting) CircularProgressIndicator(color = powerColor, modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Filled.PowerSettingsNew, null, tint = powerColor, modifier = Modifier.size(36.dp))
+                if (st.connecting) CircularProgressIndicator(color = powerColor, modifier = Modifier.size(42.dp), strokeWidth = 3.dp)
+                else Icon(Icons.Filled.PowerSettingsNew, null, tint = powerColor, modifier = Modifier.size(48.dp))
                 Text(if (on) "متصل" else if (st.connecting) "جارٍ الاتصال" else "متوقف", color = powerColor,
-                    fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                    fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
             }
         }
     }
@@ -406,12 +413,12 @@ fun PowerButton(st: UiState, onClick: () -> Unit) {
 
 @Composable
 private fun HeartbeatWave(connected: Boolean, uploadBps: Long, downloadBps: Long) {
-    val activity = (maxOf(uploadBps, downloadBps).coerceAtLeast(0L) / 65_000f).coerceIn(0f, 1f)
-    val period = (1500 - (activity * 850).toInt()).coerceIn(500, 1500)
+    val activity = (maxOf(uploadBps, downloadBps).coerceAtLeast(0L) / 160_000f).coerceIn(0f, 1f)
+    val period = (1850 - (activity * 1150).toInt()).coerceIn(650, 1850)
     val transition = rememberInfiniteTransition(label = "heartbeat")
     val phase by transition.animateFloat(0f, 1f,
         infiniteRepeatable(tween(period, easing = LinearEasing), RepeatMode.Restart), label = "phase")
-    Canvas(Modifier.fillMaxWidth().height(29.dp)) {
+    Canvas(Modifier.fillMaxWidth().height(46.dp)) {
         val mid = size.height / 2f
         drawLine(DeepRed.copy(alpha = 0.7f), Offset(0f, mid), Offset(size.width, mid), strokeWidth = 1f)
         val beat = floatArrayOf(0f, 0f, 0.05f, -0.08f, 0.10f, 0f, 0f, 0.70f, -0.92f, 0.22f, 0f, 0.04f, 0f)
@@ -424,7 +431,7 @@ private fun HeartbeatWave(connected: Boolean, uploadBps: Long, downloadBps: Long
                 val sample = position.toInt().coerceIn(0, beat.lastIndex - 1)
                 val fraction = position - sample
                 val wave = beat[sample] + (beat[sample + 1] - beat[sample]) * fraction
-                val intensity = if (connected) 0.08f + activity * 0.48f else 0.015f
+                val intensity = if (connected) 0.05f + activity * 0.45f else 0.015f
                 val y = mid - wave * size.height * intensity
                 if (i == 0) path.moveTo(0f, y) else path.lineTo(size.width * xRatio, y)
             }
@@ -443,54 +450,17 @@ private fun SpeedStat(modifier: Modifier, icon: ImageVector, color: Color, bytes
         bytesPerSecond >= 1024 -> "%.1f".format(bytesPerSecond / 1024f) to "KB/s"
         else -> bytesPerSecond.coerceAtLeast(0).toString() to "B/s"
     }
-    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(color.copy(alpha = 0.07f))
-        .padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(4.dp))
+    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.07f))
+        .padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(7.dp))
         Column {
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(display, color = color, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
-                Spacer(Modifier.width(2.dp))
-                Text(unit, color = TextPrimary, fontSize = 8.sp, modifier = Modifier.padding(bottom = 1.dp))
+                Text(display, color = color, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
+                Spacer(Modifier.width(3.dp))
+                Text(unit, color = TextPrimary, fontSize = 9.sp, modifier = Modifier.padding(bottom = 2.dp))
             }
-            Text(label, color = Dim, fontSize = 8.sp, maxLines = 1)
-        }
-    }
-}
-
-@Composable
-private fun CompactInfoChip(
-    modifier: Modifier,
-    icon: ImageVector,
-    title: String,
-    value: String,
-    tint: Color,
-    onClick: () -> Unit
-) {
-    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Color(0xFF100A16))
-        .clickable(onClick = onClick).padding(horizontal = 7.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(5.dp))
-        Column {
-            Text(title, color = Dim, fontSize = 8.sp, maxLines = 1)
-            Text(value, color = tint, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-        }
-    }
-}
-
-@Composable
-private fun CompactMetric(modifier: Modifier, title: String, value: String, flag: String? = null) {
-    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF100A16))
-        .padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (flag != null) Text(flag, fontSize = 13.sp, maxLines = 1)
-        else Icon(Icons.Filled.Public, null, tint = Red, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(5.dp))
-        Column {
-            Text(title, color = Dim, fontSize = 7.sp, maxLines = 1)
-            Text(value, color = TextPrimary, fontSize = 9.sp, maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(label, color = Dim, fontSize = 9.sp)
         }
     }
 }
@@ -730,11 +700,9 @@ private fun SubscriptionCard(
             Box(Modifier.clip(CircleShape).background(Green.copy(alpha = 0.12f)).padding(horizontal = 9.dp, vertical = 5.dp)) {
                 Text("${servers.size} سيرفر", color = Green, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
-            OutlinedButton(onClick = onRefresh, enabled = !loading,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) {
-                if (loading) CircularProgressIndicator(Modifier.size(14.dp), color = Blue, strokeWidth = 2.dp)
-                else Icon(Icons.Filled.Refresh, "تحديث الاشتراك", tint = Blue, modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(3.dp)); Text(if (loading) "يحدّث" else "تحديث", fontSize = 9.sp)
+            IconButton(onClick = onRefresh, enabled = !loading, modifier = Modifier.size(37.dp)) {
+                if (loading) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp)
+                else Icon(Icons.Filled.Refresh, "تحديث الاشتراك", tint = Blue, modifier = Modifier.size(20.dp))
             }
             IconButton(onClick = onToggle, modifier = Modifier.size(34.dp)) {
                 Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
@@ -743,13 +711,16 @@ private fun SubscriptionCard(
         }
         if (expanded) {
             HorizontalDivider(color = DeepRed.copy(alpha = 0.75f), modifier = Modifier.padding(vertical = 7.dp))
-            Text("التحديث يستخدم اتصال الشبكة المباشر ولا يفصل الـVPN.", color = Dim, fontSize = 9.sp,
-                modifier = Modifier.padding(bottom = 5.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onRename, enabled = !loading, modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = onRefresh, enabled = !loading, modifier = Modifier.weight(1f)) {
+                    if (loading) CircularProgressIndicator(Modifier.size(16.dp), color = Green, strokeWidth = 2.dp)
+                    else Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(5.dp)); Text(if (loading) "جارٍ التحديث" else "تحديث الاشتراك", fontSize = 11.sp)
+                }
+                OutlinedButton(onClick = onRename, enabled = !loading) {
                     Icon(Icons.Filled.Edit, null, modifier = Modifier.size(16.dp)); Text("تسمية", fontSize = 11.sp)
                 }
-                OutlinedButton(onClick = onRemove, enabled = !loading, modifier = Modifier.weight(1f)) {
+                OutlinedButton(onClick = onRemove, enabled = !loading) {
                     Icon(Icons.Filled.Delete, null, modifier = Modifier.size(16.dp)); Text("حذف", fontSize = 11.sp)
                 }
             }
