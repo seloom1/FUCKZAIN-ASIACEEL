@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val Ink = Color(0xFF020207); private val Panel = Color(0xFF16091F)
@@ -77,7 +78,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
 }
 
 @Composable
@@ -121,7 +121,6 @@ fun App() {
 @Composable
 fun RtlBox(c: @Composable () -> Unit) = CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) { c() }
 
-/** الخلفية: شبكة نقاط حمراء، برج، خطوط زوايا */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScene() {
     val w = size.width; val h = size.height
     drawRect(Brush.radialGradient(listOf(Color(0x88FF2638), Color(0x221B5CFF), Color.Transparent), Offset(w * 0.50f, h * 0.34f), w * 0.95f))
@@ -453,11 +452,53 @@ fun InfoCard(m: Modifier, icon: ImageVector, title: String, value: String, vc: C
 fun Links(st: UiState) {
     val ctx = LocalContext.current
     val channelLinks = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
     var editingIndex by remember { mutableStateOf<Int?>(null) }
+    var subscriptionUrl by remember { mutableStateOf("") }
+    var loadingSubscription by remember { mutableStateOf(false) }
+
     Column(Modifier.fillMaxSize().padding(20.dp)) {
         Text("إدارة الروابط", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-        Text("VLESS · VMess · Trojan · WireGuard", color = Dim, fontSize = 13.sp)
+        Text("VLESS · VMess · Trojan · WireGuard · اشتراكات", color = Dim, fontSize = 13.sp)
         Spacer(Modifier.height(14.dp))
+
+        OutlinedTextField(
+            value = subscriptionUrl,
+            onValueChange = { subscriptionUrl = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("رابط الاشتراك / raw URL") },
+            placeholder = { Text("https://raw.githubusercontent.com/.../OODI.txt") }
+        )
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = {
+            val input = subscriptionUrl.trim()
+            if (input.isBlank()) {
+                Toast.makeText(ctx, "أدخل رابط اشتراك أولاً", Toast.LENGTH_SHORT).show()
+                return@Button
+            }
+            loadingSubscription = true
+            scope.launch {
+                val count = runCatching { Vpn.importFromUrl(ctx, input) }.getOrElse { 0 }
+                loadingSubscription = false
+                if (count > 0) {
+                    subscriptionUrl = ""
+                    Toast.makeText(ctx, "تمت إضافة $count اشتراك/تكوين", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(ctx, "لا يوجد محتوى صالح في الرابط", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }, colors = ButtonDefaults.buttonColors(containerColor = Red), modifier = Modifier.fillMaxWidth(), enabled = !loadingSubscription) {
+            if (loadingSubscription) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+            }
+            Icon(Icons.Filled.CloudDownload, null)
+            Spacer(Modifier.width(8.dp))
+            Text("إضافة اشتراك")
+        }
+
+        Spacer(Modifier.height(12.dp))
         Button(onClick = {
             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val txt = cm.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
@@ -490,6 +531,12 @@ fun Links(st: UiState) {
                         Text(serverFormat(s), color = if (selected) Green else Red.copy(alpha = 0.9f), fontSize = 10.sp, maxLines = 1)
                     }
                     if (selected) Icon(Icons.Filled.CheckCircle, "محدد", tint = Green, modifier = Modifier.size(21.dp))
+                    IconButton(onClick = { Vpn.moveServer(ctx, i, i - 1) }, enabled = i > 0, modifier = Modifier.size(34.dp)) {
+                        Icon(Icons.Filled.ArrowUpward, "أعلى", tint = Blue, modifier = Modifier.size(19.dp))
+                    }
+                    IconButton(onClick = { Vpn.moveServer(ctx, i, i + 1) }, enabled = i < st.servers.lastIndex, modifier = Modifier.size(34.dp)) {
+                        Icon(Icons.Filled.ArrowDownward, "أسفل", tint = Blue, modifier = Modifier.size(19.dp))
+                    }
                     IconButton(onClick = { editingIndex = i }, modifier = Modifier.size(34.dp)) { Icon(Icons.Filled.Edit, "تعديل", tint = Blue, modifier = Modifier.size(19.dp)) }
                     IconButton(onClick = { Vpn.remove(ctx, i) }, modifier = Modifier.size(34.dp)) { Icon(Icons.Filled.Delete, null, tint = Dim, modifier = Modifier.size(19.dp)) }
                 }
@@ -786,7 +833,7 @@ fun SettingsScreen(st: UiState) {
                 Switch(checked = st.bypassLanRouteEnabled,
                     onCheckedChange = { Vpn.setBypassLanRouteEnabled(ctx, it) })
             }
-            Text("يسمح بالوصول إلى الراوتر والكاميرات وأجهزة الشبكة المحلية؛ عند تفعيله يستخدم مسارات IPv4 منفصلة دون مسار 0.0.0.0/0.",
+            Text("يسمح بالوصول إلى الراوتر والكاميرات وأجهزة الشبكة المحلية؛ عند تفعيله يستخدم مسارات IPv4 منفصلة بدل المسار الافتراضي.",
                 color = Dim, fontSize = 12.sp)
         }
         Spacer(Modifier.height(14.dp))
@@ -829,7 +876,7 @@ fun SettingsScreen(st: UiState) {
             }
         }
         Spacer(Modifier.height(14.dp))
-        Text("لإضافة سيرفر: انسخ الرابط، ثم افتح «إدارة الروابط» واضغط «لصق من الحافظة». بعد اختيار السيرفر اضغط زر الاتصال من الرئيسية.",
+        Text("لإضافة سيرفر: انسخ الرابط، ثم افتح «إدارة الروابط» واضغط «لصق من الحافظة». بعد اختيار السيرفر اضغط «تفعيل» لتحديث الاتصال.",
             color = Dim, fontSize = 13.sp)
     }
 }

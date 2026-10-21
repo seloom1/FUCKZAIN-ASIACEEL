@@ -27,7 +27,7 @@ data class UiState(
 ) { val current get() = servers.getOrNull(selected) }
 
 object Vpn {
-    private const val DEFAULT_WARP = "wireguard://98qlf4cSnq2VMmonjeWZI1dS1994IzfbR%2FfRdG%2FiCoE%3D@engage.cloudflareclient.com:2408?address=172.16.0.2%2F32%2C2606%3A4700%3A110%3A8d70%3A8df1%3A6e3d%3A693b%3Aea40%2F128&publickey=bmXOC%2BF1FxEMF9dyiK2H5%2F1SUtzH0JuVo51h2wPfgyo%3D&privatekey=98qlf4cSnq2VMmonjeWZI1dS1994IzfbR%2FfRdG%2FiCoE%3D#seloom1warp"
+    private const val DEFAULT_WARP = "wireguard://98qlf4cSnq2VMmonjeWZI1dS1994IzfbR%2FfRdG%2FiCoE%3D@engage.cloudflareclient.com:2408?address=172.16.0.2%2F32%2C2606%3A4700%3A110%3A8d70%3A8df1%3A6e[... ]"
     val state = MutableStateFlow(UiState())
     @Volatile var stopRequested = true
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -61,12 +61,52 @@ object Vpn {
         .putString("links", state.value.servers.joinToString("\u0001") { it.raw })
         .putInt("sel", state.value.selected).apply()
 
-    /** يضيف روابط من نص (سطر لكل رابط). يعيد عدد ما أُضيف. */
+    fun moveServer(c: Context, fromIndex: Int, toIndex: Int) {
+        val items = state.value.servers
+        if (fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
+        val reordered = items.toMutableList()
+        val item = reordered.removeAt(fromIndex)
+        reordered.add(toIndex, item)
+
+        val currentSelection = state.value.selected
+        val newSelected = when {
+            currentSelection == fromIndex -> toIndex
+            fromIndex < currentSelection && toIndex >= currentSelection -> currentSelection - 1
+            fromIndex > currentSelection && toIndex <= currentSelection -> currentSelection + 1
+            else -> currentSelection
+        }
+
+        state.value = state.value.copy(servers = reordered, selected = newSelected)
+        save(c)
+    }
+
     fun import(c: Context, text: String): Int {
         val chunks = if (text.contains("[Interface]")) listOf(text) else text.lines()
         val added = chunks.mapNotNull(ConfigParser::parse)
         state.value = state.value.copy(servers = state.value.servers + added)
         save(c); return added.size
+    }
+
+    suspend fun importFromUrl(c: Context, url: String): Int {
+        val target = url.trim()
+        if (target.isBlank()) return 0
+        val content = fetchRemoteConfigText(target) ?: return 0
+        return import(c, content)
+    }
+
+    private suspend fun fetchRemoteConfigText(url: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 10_000
+                readTimeout = 15_000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "FUCKZAIN-ASIACEEL Android")
+                setRequestProperty("Accept", "text/plain, application/octet-stream, */*")
+            }
+            if (connection.responseCode !in 200..299) return@withContext null
+            connection.inputStream.bufferedReader().use { it.readText() }
+        }.getOrNull()
     }
 
     fun select(c: Context, i: Int) { state.value = state.value.copy(selected = i); save(c) }
@@ -139,6 +179,10 @@ object Vpn {
 
     fun start(c: Context) {
         appContext = c.applicationContext
+        if (state.value.connected || state.value.connecting) {
+            log("تجاهل بدء الاتصال: النفق يعمل بالفعل")
+            return
+        }
         val s = state.value.current ?: run {
             log("فشل البدء: لا يوجد سيرفر محدد")
             state.value = state.value.copy(error = "أضف رابطاً أولاً")
@@ -234,8 +278,6 @@ object Vpn {
     /** Route the lookup through sing-box's loopback proxy while the app UID remains excluded from TUN. */
     private fun fetchExitLocation(): ExitLocation? {
         return try {
-            // api4.ipify forces the result to IPv4; the previous generic endpoint
-            // could return a long IPv6 address on IPv6-preferred networks.
             val ipJson = requestJson("https://api4.ipify.org?format=json") ?: return null
             val ip = ipJson.optString("ip").takeIf { it.contains('.') } ?: return null
             val geo = requestJson("https://ipapi.co/$ip/json/")
