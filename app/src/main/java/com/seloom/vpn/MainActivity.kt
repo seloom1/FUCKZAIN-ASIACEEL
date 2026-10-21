@@ -502,6 +502,19 @@ fun Links(st: UiState) {
         Button(onClick = {
             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val txt = cm.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+            if (txt.startsWith("http://") || txt.startsWith("https://")) {
+                loadingSubscription = true
+                scope.launch {
+                    val count = runCatching { Vpn.importFromUrl(ctx, txt) }.getOrElse { 0 }
+                    loadingSubscription = false
+                    if (count > 0) {
+                        Toast.makeText(ctx, "تمت إضافة $count من الرابط", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(ctx, "الرابط لا يحتوي على إعدادات صالحة", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                return@Button
+            }
             val n = Vpn.import(ctx, txt)
             Toast.makeText(ctx, if (n > 0) "تمت إضافة $n" else "لا يوجد رابط صالح في الحافظة", Toast.LENGTH_SHORT).show()
         }, colors = ButtonDefaults.buttonColors(containerColor = Red), modifier = Modifier.fillMaxWidth()) {

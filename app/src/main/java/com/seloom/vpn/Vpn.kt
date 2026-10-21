@@ -82,14 +82,29 @@ object Vpn {
 
     fun import(c: Context, text: String): Int {
         val chunks = if (text.contains("[Interface]")) listOf(text) else text.lines()
-        val added = chunks.mapNotNull(ConfigParser::parse)
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filterNot { it.startsWith("http://") || it.startsWith("https://") }
+        val seen = state.value.servers.map { it.raw }.toHashSet()
+        val added = buildList {
+            for (raw in chunks) {
+                val parsed = ConfigParser.parse(raw) ?: continue
+                if (parsed.raw !in seen) {
+                    add(parsed)
+                    seen += parsed.raw
+                }
+            }
+        }
+        if (added.isEmpty()) return 0
         state.value = state.value.copy(servers = state.value.servers + added)
-        save(c); return added.size
+        save(c)
+        return added.size
     }
 
     suspend fun importFromUrl(c: Context, url: String): Int {
         val target = url.trim()
         if (target.isBlank()) return 0
+        if (!(target.startsWith("http://") || target.startsWith("https://"))) return import(c, target)
         val content = fetchRemoteConfigText(target) ?: return 0
         return import(c, content)
     }
@@ -275,7 +290,6 @@ object Vpn {
 
     private data class ExitLocation(val ip: String?, val countryName: String?, val countryCode: String?)
 
-    /** Route the lookup through sing-box's loopback proxy while the app UID remains excluded from TUN. */
     private fun fetchExitLocation(): ExitLocation? {
         return try {
             val ipJson = requestJson("https://api4.ipify.org?format=json") ?: return null
